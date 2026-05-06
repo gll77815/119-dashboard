@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智慧消防大屏 · 应急指挥模式（一期）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#060D18;color:#E8F4FF;font-family:'PingFang SC','Microsoft YaHei',sans-serif;overflow:hidden;width:100vw;height:100vh;}
+
+/* ══ TOPBAR ══ */
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(6,13,24,.97);border-bottom:1px solid rgba(255,149,0,.25);display:flex;align-items:center;padding:0 16px;z-index:300;gap:10px;}
+.logo{font-size:14px;font-weight:700;letter-spacing:2px;color:#FF9500;border-right:1px solid rgba(255,149,0,.3);padding-right:12px;white-space:nowrap;}
+.mode-tabs{display:flex;gap:3px;flex:1;}
+.mode-tab{padding:4px 12px;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid rgba(255,149,0,.2);color:rgba(232,244,255,.5);transition:all .2s;background:transparent;}
+.mode-tab:hover{border-color:rgba(255,149,0,.5);color:#E8F4FF;}
+.mode-tab.active{background:rgba(255,149,0,.18);border-color:#FF9500;color:#E8F4FF;font-weight:600;}
+.mode-tab.alarm.active{background:rgba(226,75,74,.22);border-color:#E24B4A;color:#FF7070;}
+#clock{font-size:12px;color:rgba(232,244,255,.55);border-left:1px solid rgba(255,149,0,.3);padding-left:12px;white-space:nowrap;}
+
+/* ══ MAIN VIEW ══ */
+#main-view{position:fixed;top:48px;left:0;right:48px;bottom:36px;}
+#three-canvas{width:100%;height:100%;display:block;}
+#help-tip{position:absolute;bottom:8px;left:12px;font-size:9px;color:rgba(232,244,255,.22);line-height:1.9;pointer-events:none;}
+
+/* ══ ALARM BANNER ══ */
+#alarm-banner{position:fixed;top:48px;left:0;right:48px;height:34px;background:linear-gradient(90deg,rgba(226,75,74,.28),rgba(226,75,74,.10));border-bottom:1px solid rgba(226,75,74,.5);display:none;align-items:center;padding:0 16px;gap:12px;z-index:200;}
+#alarm-banner.show{display:flex;}
+.ab-pulse{width:7px;height:7px;border-radius:50%;background:#E24B4A;animation:pulseA 1.3s infinite;}
+@keyframes pulseA{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(226,75,74,.6)}50%{opacity:.5;box-shadow:0 0 0 6px rgba(226,75,74,0)}}
+.ab-title{font-size:13px;font-weight:700;color:#E24B4A;}
+.ab-info{font-size:11px;color:rgba(232,244,255,.65);flex:1;}
+.ab-btn{padding:3px 10px;border-radius:3px;font-size:11px;cursor:pointer;background:rgba(226,75,74,.18);border:1px solid rgba(226,75,74,.45);color:#E24B4A;transition:all .2s;}
+.ab-btn:hover{background:rgba(226,75,74,.35);}
+.ab-btn.g{background:rgba(76,175,80,.12);border-color:rgba(76,175,80,.4);color:#4CAF50;}
+
+/* ══ FLOAT COL ══ */
+#float-col{position:fixed;top:48px;right:0;bottom:36px;width:48px;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;z-index:250;background:rgba(8,16,28,.93);border-left:1px solid rgba(255,149,0,.2);}
+.fb{width:36px;height:36px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border:1px solid rgba(255,149,0,.2);background:rgba(255,149,0,.06);color:rgba(232,244,255,.55);transition:all .2s;font-size:15px;}
+.fb:hover,.fb.active{background:rgba(255,149,0,.2);border-color:#FF9500;color:#E8F4FF;}
+.fb-lbl{font-size:7.5px;line-height:1;}
+.fb-div{width:22px;height:1px;background:rgba(255,149,0,.2);margin:3px 0;}
+
+/* ══ FLOAT PANELS ══ */
+.fpanel{position:fixed;right:48px;width:230px;z-index:248;background:rgba(8,20,38,.97);border:1px solid rgba(255,149,0,.3);border-radius:8px 0 0 8px;backdrop-filter:blur(14px);box-shadow:-6px 0 28px rgba(0,0,0,.45);transform:translateX(8px);opacity:0;pointer-events:none;transition:transform .22s,opacity .22s;max-height:calc(100vh - 100px);overflow-y:auto;}
+.fpanel::-webkit-scrollbar{width:3px;}.fpanel::-webkit-scrollbar-thumb{background:rgba(255,149,0,.3);border-radius:2px;}
+.fpanel.open{transform:translateX(0);opacity:1;pointer-events:all;}
+.fp-ttl{font-size:10px;font-weight:600;color:rgba(74,144,217,.8);letter-spacing:1.5px;padding:11px 13px 7px;border-bottom:1px solid rgba(255,149,0,.12);}
+#panel-scene{top:62px;}
+.sc-btn{display:flex;align-items:center;gap:9px;padding:8px 13px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,.04);}
+.sc-btn:hover{background:rgba(255,149,0,.1);}
+.sc-btn.active{background:rgba(255,149,0,.18);border-right:2px solid #FF9500;}
+.sc-btn.alarm-s.active .sc-nm{color:#E24B4A;}
+.sc-ico{font-size:14px;width:20px;text-align:center;}
+.sc-nm{font-size:12px;color:#E8F4FF;flex:1;}
+.sc-ds{font-size:9px;color:rgba(232,244,255,.38);}
+.sc-user{font-size:8.5px;color:rgba(255,149,0,.65);margin-top:2px;letter-spacing:.2px;}
+#panel-layer{top:108px;}
+.lp-preset{padding:7px 10px;border-bottom:1px solid rgba(255,149,0,.1);}
+.lp-pgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;}
+.lp-pb{padding:4px;border-radius:3px;font-size:9.5px;cursor:pointer;text-align:center;background:rgba(74,144,217,.07);border:1px solid rgba(255,149,0,.2);color:rgba(232,244,255,.6);transition:all .2s;}
+.lp-pb:hover{background:rgba(255,149,0,.2);color:#E8F4FF;}
+.lr{display:flex;align-items:center;gap:8px;padding:6px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .14s;}
+.lr:hover{background:rgba(255,149,0,.08);}
+.lr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.lr-nm{font-size:11px;color:rgba(232,244,255,.75);flex:1;}
+.lr-tag{font-size:8.5px;padding:1px 5px;border-radius:10px;background:rgba(255,149,0,.14);color:#FF9500;white-space:nowrap;}
+.lr-tag.a{background:rgba(76,175,80,.14);color:#4CAF50;}
+.tsw{width:28px;height:14px;border-radius:7px;background:rgba(255,255,255,.1);cursor:pointer;transition:background .2s;position:relative;flex-shrink:0;}
+.tsw.on{background:#FF9500;}
+.tsw::after{content:'';position:absolute;width:10px;height:10px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
+.tsw.on::after{left:16px;}
+#panel-view{top:154px;}
+.vo{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;}
+.vo:hover{background:rgba(255,149,0,.1);}
+.vo.active{background:rgba(255,149,0,.2);}
+.vo-ico{font-size:18px;width:22px;text-align:center;}
+.vo-nm{font-size:12px;color:#E8F4FF;}
+.vo-ds{font-size:9px;color:rgba(232,244,255,.38);margin-top:1px;}
+.vo.disabled{opacity:.42;cursor:default;}
+.vo.disabled:hover{background:transparent;}
+.soon-tag{font-size:8px;padding:2px 5px;border-radius:3px;background:rgba(255,149,0,.1);color:rgba(74,144,217,.6);border:1px solid rgba(255,149,0,.18);white-space:nowrap;}
+#panel-floor{top:200px;}
+.fl-row{display:flex;align-items:center;gap:8px;padding:8px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .14s;}
+.fl-row:hover{background:rgba(255,149,0,.1);}
+.fl-row.active{background:rgba(255,149,0,.2);border-right:2px solid #FF9500;}
+#panel-overlay{position:fixed;inset:0;z-index:240;display:none;}
+#panel-overlay.show{display:block;}
+
+/* ══ BOTTOM BAR ══ */
+#bottombar{position:fixed;bottom:0;left:0;right:48px;height:36px;background:rgba(6,13,24,.96);border-top:1px solid rgba(255,149,0,.2);display:flex;align-items:center;padding:0 14px;gap:20px;z-index:300;font-size:10.5px;color:rgba(232,244,255,.5);}
+.sv{color:#E8F4FF;font-weight:600;}
+.sok{color:#4CAF50;}.swrn{color:#FFC107;}.serr{color:#E24B4A;}
+
+/* ══ SMOKE TIMELINE ══ */
+#smoke-tl{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:rgba(8,20,38,.95);border:1px solid rgba(255,107,53,.4);border-radius:8px;padding:7px 13px;z-index:260;display:none;align-items:center;gap:9px;backdrop-filter:blur(10px);}
+#smoke-tl.show{display:flex;}
+.stl-lbl{font-size:11px;color:rgba(255,107,53,.85);white-space:nowrap;}
+.stl-btn{padding:3px 9px;border-radius:3px;font-size:10.5px;cursor:pointer;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);color:rgba(232,244,255,.7);transition:all .2s;}
+.stl-btn.active,.stl-btn:hover{background:rgba(255,107,53,.28);border-color:#FF6B35;color:#E8F4FF;}
+
+/* ══ HOVER CARD ══ */
+#hcard{position:fixed;z-index:350;width:254px;background:rgba(8,20,38,.97);border:1px solid rgba(255,149,0,.4);border-radius:8px;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.6);backdrop-filter:blur(12px);opacity:0;transform:translateY(5px);transition:opacity .14s,transform .14s;}
+#hcard.show{opacity:1;transform:translateY(0);pointer-events:all;}
+#hcard.locked{border-color:rgba(255,149,0,.7);}
+.hc-lock-bar{display:none;align-items:center;justify-content:space-between;padding:4px 10px 0;font-size:9px;color:rgba(74,144,217,.6);}
+#hcard.locked .hc-lock-bar{display:flex;}
+.hc-close-btn{cursor:pointer;font-size:13px;color:rgba(232,244,255,.35);padding:1px 4px;border-radius:3px;transition:all .15s;}
+.hc-close-btn:hover{background:rgba(255,255,255,.1);color:#E8F4FF;}
+.hch{display:flex;align-items:center;gap:8px;padding:9px 12px 7px;border-bottom:1px solid rgba(255,149,0,.12);}
+.hch-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.hch-type{font-size:10px;color:rgba(232,244,255,.5);flex:1;}
+.hch-badge{font-size:10px;font-weight:600;}
+.hcb{padding:9px 12px;}
+.hcr{display:flex;justify-content:space-between;padding:2.5px 0;font-size:11px;}
+.hcl{color:rgba(232,244,255,.46);}
+.hcv{color:#E8F4FF;font-weight:500;}
+.hcdiv{height:1px;background:rgba(255,149,0,.1);margin:6px 0;}
+.hcprop{padding:0 12px 7px;}
+.hcp{padding:3px 0;font-size:11px;line-height:1.5;}
+.hcpl{color:rgba(74,144,217,.8);font-weight:600;font-size:10px;}
+.hcpa{display:flex;gap:5px;padding:7px 12px;border-top:1px solid rgba(255,149,0,.1);}
+.hca{flex:1;padding:5px 3px;border-radius:4px;font-size:9.5px;text-align:center;background:rgba(255,149,0,.1);border:1px solid rgba(255,149,0,.25);color:#FF9500;cursor:pointer;transition:all .15s;pointer-events:all;}
+.hca:hover{background:rgba(255,149,0,.25);}
+.hca.r{background:rgba(226,75,74,.1);border-color:rgba(226,75,74,.3);color:#E24B4A;}
+.hcwarn{color:#E24B4A;font-size:11px;font-weight:600;padding:3px 12px 7px;animation:pulseA .9s infinite;}
+
+/* ══ FLOOR DETAIL VIEW ══ */
+#floor-view{position:fixed;top:48px;left:0;right:48px;bottom:36px;background:#070E1A;z-index:100;display:none;flex-direction:column;}
+#floor-view.show{display:flex;}
+#fv-header{height:32px;background:rgba(6,13,24,.95);border-bottom:1px solid rgba(255,149,0,.18);display:flex;align-items:center;padding:0 12px;gap:10px;flex-shrink:0;}
+#fv-floor-label{font-size:12px;font-weight:700;color:#E8F4FF;}
+#fv-floor-sub{font-size:10px;color:rgba(232,244,255,.38);}
+.fv-back-btn{margin-left:auto;padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid rgba(255,149,0,.22);color:rgba(232,244,255,.5);background:transparent;transition:all .2s;white-space:nowrap;}
+.fv-back-btn:hover{background:rgba(255,149,0,.15);border-color:#FF9500;color:#E8F4FF;}
+
+/* 鹰眼 + 楼层导航 */
+#eagle-eye{position:absolute;left:14px;bottom:14px;z-index:20;width:176px;border:1px solid rgba(255,149,0,.45);border-radius:8px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.6);background:rgba(6,13,24,.96);backdrop-filter:blur(10px);}
+#eagle-hdr{display:flex;align-items:center;padding:5px 9px;gap:7px;border-bottom:1px solid rgba(255,149,0,.15);background:rgba(255,149,0,.06);cursor:pointer;transition:background .15s;}
+#eagle-hdr:hover{background:rgba(255,149,0,.18);}
+#eagle-hdr-lbl{font-size:10px;font-weight:600;color:rgba(74,144,217,.9);letter-spacing:.5px;flex:1;}
+.eagle-back{font-size:9.5px;color:rgba(232,244,255,.4);white-space:nowrap;}
+#bldg-thumb{width:176px;height:112px;object-fit:cover;display:block;opacity:.84;border-bottom:1px solid rgba(255,149,0,.1);}
+#eagle-floor-list{padding:4px 0;}
+.efl-row{display:flex;align-items:center;gap:6px;padding:5px 9px;cursor:pointer;transition:background .14s;border-left:2px solid transparent;}
+.efl-row:hover{background:rgba(255,149,0,.1);}
+.efl-row.active{background:rgba(255,149,0,.18);border-left-color:#FF9500;}
+.efl-row.active .efl-lbl{color:#E8F4FF;font-weight:700;}
+.efl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.efl-lbl{font-size:11px;color:rgba(232,244,255,.65);width:24px;}
+.efl-theme{font-size:9.5px;color:rgba(232,244,255,.35);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.efl-st{font-size:9px;white-space:nowrap;}
+#fv-tip{position:absolute;bottom:14px;right:14px;font-size:9px;color:rgba(232,244,255,.2);line-height:1.8;pointer-events:none;text-align:right;}
+#fv-body{flex:1;display:flex;min-height:0;}
+#fv-canvas-wrap{flex:1;position:relative;min-width:0;}
+#floor-plan-canvas{width:100%;height:100%;display:block;cursor:grab;}
+#floor-plan-canvas:active{cursor:grabbing;}
+
+/* ══ TOAST ══ */
+#toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:rgba(255,149,0,.92);color:#fff;padding:6px 18px;border-radius:20px;font-size:12px;z-index:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+
+/* ══ X-RAY BADGE ══ */
+#xray-badge{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:rgba(26,75,107,.92);border:1px solid #1A5B7A;border-radius:4px;padding:3px 12px;font-size:10.5px;color:#4ABFDC;z-index:260;display:none;}
+#xray-badge.show{display:block;}
+
+
+/* ════════════════════════════════════════════════
+   应急指挥模式一期 - 信息窗浮层样式
+   ════════════════════════════════════════════════ */
+
+/* 左侧信息窗容器 */
+.left-info-panel {
+  position: fixed;
+  top: 56px;
+  left: 0;
+  bottom: 36px;
+  width: 320px;
+  z-index: 260;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.left-info-panel::-webkit-scrollbar { width: 3px; }
+.left-info-panel::-webkit-scrollbar-thumb { background: rgba(255,149,0,.3); border-radius: 2px; }
+
+/* 毛玻璃卡片通用 */
+.glass-card {
+  background: rgba(8, 20, 38, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 149, 0, 0.15);
+  border-radius: 8px;
+  padding: 14px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+.glass-card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.glass-card-title h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: #E8F4FF;
+  letter-spacing: 1px;
+}
+.card-tag {
+  font-size: 9px; padding: 2px 6px; border-radius: 3px; font-weight: 600; letter-spacing: 0.5px;
+}
+.card-tag.orange { background: rgba(255,149,0,0.15); color: #FF9500; }
+.card-tag.red { background: rgba(226,75,74,0.15); color: #E24B4A; }
+
+/* 告警详情摘要 */
+.alarm-detail-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  font-size: 11px;
+}
+.alarm-detail-row:last-child { border-bottom: none; }
+.alarm-detail-label { color: rgba(232,244,255,.45); }
+.alarm-detail-value { color: #E8F4FF; font-weight: 500; }
+.alarm-detail-value.err { color: #E24B4A; }
+.alarm-detail-value.warn { color: #FFC107; }
+.alarm-detail-value.ok { color: #4CAF50; }
+
+/* 设备实时监测值 */
+.monitor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 8px 0;
+}
+.monitor-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px;
+  font-size: 10px;
+}
+.monitor-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.monitor-dot.ok { background: #4CAF50; box-shadow: 0 0 4px rgba(76,175,80,.5); }
+.monitor-dot.err { background: #E24B4A; box-shadow: 0 0 4px rgba(226,75,74,.5); animation: pulseA 1s infinite; }
+.monitor-dot.off { background: #FFC107; box-shadow: 0 0 4px rgba(255,193,7,.5); }
+.monitor-name { color: rgba(232,244,255,.6); flex: 1; }
+.monitor-val { color: #E8F4FF; font-weight: 600; }
+
+/* 区域设备状态网格 */
+.device-status-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.device-status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
+  border-radius: 4px;
+  font-size: 10px;
+}
+.device-status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.device-status-dot.ok { background: #4CAF50; box-shadow: 0 0 4px rgba(76,175,80,.5); }
+.device-status-dot.err { background: #E24B4A; box-shadow: 0 0 4px rgba(226,75,74,.5); }
+.device-status-name { color: rgba(232,244,255,.6); flex: 1; }
+.device-status-val { font-size: 10px; font-weight: 600; }
+.device-status-val.ok { color: #4CAF50; }
+.device-status-val.err { color: #E24B4A; }
+
+/* 底部操作按钮 */
+.card-action {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,149,0,.3);
+  background: rgba(255,149,0,.1);
+  color: #FF9500;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  transition: all .2s;
+  margin-top: 8px;
+}
+.card-action:hover { background: rgba(255,149,0,.2); }
+
+/* 右侧抽屉面板（简化版应急通讯） */
+.right-drawer {
+  position: fixed;
+  top: 48px;
+  right: 48px;
+  bottom: 36px;
+  width: 300px;
+  z-index: 260;
+  background: rgba(8,20,38,0.88);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-left: 1px solid rgba(255,149,0,0.2);
+  box-shadow: -4px 0 24px rgba(0,0,0,0.5);
+  overflow-y: auto;
+  padding: 12px;
+  transition: transform .3s ease;
+}
+.right-drawer::-webkit-scrollbar { width: 3px; }
+.right-drawer::-webkit-scrollbar-thumb { background: rgba(255,149,0,.3); border-radius: 2px; }
+.right-drawer.collapsed { transform: translateX(100%); }
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255,149,0,.12);
+}
+.drawer-header h3 { font-size: 14px; font-weight: 700; color: #E8F4FF; letter-spacing: 1px; }
+.drawer-close {
+  width: 24px; height: 24px; border-radius: 4px; border: 1px solid rgba(255,255,255,.1);
+  background: transparent; color: rgba(232,244,255,.5); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; transition: all .2s;
+}
+.drawer-close:hover { background: rgba(255,255,255,.06); color: #E8F4FF; }
+
+/* 联系人列表 */
+.contact-list { margin-bottom: 10px; }
+.contact-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  transition: background .15s;
+  cursor: pointer;
+}
+.contact-item:hover { background: rgba(255,149,0,.05); }
+.contact-avatar {
+  width: 32px; height: 32px; border-radius: 50%; background: rgba(255,149,0,.12);
+  border: 1px solid rgba(255,149,0,.25); display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: #FF9500; flex-shrink: 0;
+}
+.contact-info { flex: 1; }
+.contact-name { font-size: 11px; color: #E8F4FF; font-weight: 600; }
+.contact-role { font-size: 9px; color: rgba(232,244,255,.4); }
+.contact-action {
+  font-size: 10px; padding: 3px 8px; border-radius: 3px; border: 1px solid rgba(0,212,255,.2);
+  background: rgba(0,212,255,.05); color: #00D4FF; cursor: pointer; transition: all .2s;
+}
+.contact-action:hover { background: rgba(0,212,255,.12); }
+
+/* 二期提示 */
+.phase-hint {
+  text-align: center;
+  padding: 8px;
+  font-size: 9px;
+  color: rgba(232,244,255,.3);
+  border-top: 1px solid rgba(255,255,255,.04);
+  margin-top: 10px;
+}
+
+/* 模态弹窗 */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 400;
+  display: none; align-items: center; justify-content: center; backdrop-filter: blur(4px);
+}
+.modal-overlay.show { display: flex; }
+.modal-box {
+  width: 480px; max-height: 80vh; background: rgba(8,20,38,0.95); backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,149,0,.25); border-radius: 10px; box-shadow: 0 12px 48px rgba(0,0,0,.6);
+  overflow-y: auto; padding: 20px;
+}
+.modal-box::-webkit-scrollbar { width: 3px; }
+.modal-box::-webkit-scrollbar-thumb { background: rgba(255,149,0,.3); border-radius: 2px; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+  padding-bottom: 10px; border-bottom: 1px solid rgba(255,149,0,.12);
+}
+.modal-header h3 { font-size: 15px; font-weight: 700; color: #E8F4FF; }
+.modal-close {
+  width: 28px; height: 28px; border-radius: 4px; border: 1px solid rgba(255,255,255,.1);
+  background: transparent; color: rgba(232,244,255,.5); cursor: pointer; font-size: 16px;
+  display: flex; align-items: center; justify-content: center; transition: all .2s;
+}
+.modal-close:hover { background: rgba(255,255,255,.06); color: #E8F4FF; }
+.modal-body { font-size: 12px; color: rgba(232,244,255,.7); line-height: 1.7; }
+.modal-body .detail-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04); }
+.modal-body .detail-label { color: rgba(232,244,255,.45); }
+.modal-body .detail-value { color: #E8F4FF; font-weight: 500; }
+.modal-body .detail-value.warn { color: #FF9500; }
+.modal-body .detail-value.err { color: #E24B4A; }
+.modal-body .detail-value.ok { color: #4CAF50; }
+
+/* ════════════════════════════════════════════════
+   布局修复
+   ════════════════════════════════════════════════ */
+
+/* 鹰眼视图z-index提升 */
+#eagle-eye { z-index: 270 !important; }
+
+/* 状态提示条宽度缩小 */
+#alarm-banner { left: 320px !important; right: 48px !important; }
+
+/* ════════════════════════════════════════════════
+   应急通讯悬浮卡片（119/120）
+   ════════════════════════════════════════════════ */
+.emergency-float-cards {
+  position: fixed;
+  top: 100px;
+  right: 60px;
+  z-index: 260;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.emergency-float-card {
+  width: 180px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.fire-card {
+  background: rgba(226,75,74,.12);
+  border: 1px solid rgba(226,75,74,.3);
+}
+.med-card {
+  background: rgba(76,175,80,.08);
+  border: 1px solid rgba(76,175,80,.25);
+}
+.efc-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.efc-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #E24B4A;
+}
+.efc-status {
+  font-size: 9px;
+  color: rgba(226,75,74,.6);
+  margin-top: 1px;
+}
+.efc-countdown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 28px;
+  font-weight: 700;
+  color: #E24B4A;
+  text-align: center;
+  padding: 8px 0 2px;
+  letter-spacing: 2px;
+}
+.efc-label {
+  font-size: 9px;
+  color: rgba(232,244,255,.35);
+  text-align: center;
+}
+
+/* ════════════════════════════════════════════════
+   一键报警按钮
+   ════════════════════════════════════════════════ */
+.sos-btn {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  width: 100%; padding: 12px; border-radius: 8px;
+  border: 1px solid rgba(226,75,74,.4);
+  background: linear-gradient(135deg, rgba(226,75,74,.15), rgba(226,75,74,.05));
+  cursor: pointer; transition: all .2s;
+  animation: sosPulse 2s ease-in-out infinite;
+}
+@keyframes sosPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(226,75,74,.3); }
+  50% { box-shadow: 0 0 12px 2px rgba(226,75,74,.15); }
+}
+.sos-btn:hover { background: linear-gradient(135deg, rgba(226,75,74,.25), rgba(226,75,74,.1)); }
+.sos-icon { font-size: 20px; }
+.sos-text { font-size: 13px; font-weight: 700; color: #E24B4A; letter-spacing: 2px; }
+.sos-sub { font-size: 9px; color: rgba(232,244,255,.4); }
+
+/* 救援队到场状态 */
+.drawer-team-status {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px;
+  background: rgba(226,75,74,.06);
+  border: 1px solid rgba(226,75,74,.15);
+  border-radius: 6px;
+}
+.drawer-team-name { font-size: 12px; font-weight: 600; color: #E24B4A; }
+.drawer-team-eta { font-size: 10px; color: rgba(232,244,255,.45); margin-top: 2px; }
+.drawer-eta-countdown {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 22px; font-weight: 700; color: #E24B4A;
+  text-align: center; padding: 6px 0; letter-spacing: 2px;
+}
+
+/* ════════════════════════════════════════════════
+   底部摄像头横向滚动轮播
+   ════════════════════════════════════════════════ */
+.camera-scroll-container {
+  flex: 1; overflow: hidden; position: relative;
+}
+.camera-scroll-track {
+  display: flex; gap: 8px;
+  animation: cameraScroll 30s linear infinite;
+}
+@keyframes cameraScroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+.camera-scroll-track:hover { animation-play-state: paused; }
+.camera-feed {
+  flex-shrink: 0; width: 160px; cursor: pointer;
+  border: 1px solid rgba(255,149,0,.12); border-radius: 4px;
+  overflow: hidden; transition: border-color .2s;
+}
+.camera-feed:hover { border-color: rgba(255,149,0,.4); }
+.camera-feed-placeholder {
+  height: 72px; background: rgba(255,255,255,.02);
+  display: flex; align-items: center; justify-content: center;
+}
+.camera-feed-label {
+  font-size: 9px; color: rgba(232,244,255,.35);
+  padding: 3px 6px; font-family: 'JetBrains Mono', monospace;
+  background: rgba(0,0,0,.3);
+}
+
+/* ════════════════════════════════════════════════
+   调度弹窗样式
+   ════════════════════════════════════════════════ */
+.dispatch-form-group { margin-bottom: 14px; }
+.dispatch-form-label {
+  display: block; font-size: 11px; color: rgba(232,244,255,.6); margin-bottom: 6px;
+}
+.dispatch-form-label .req { color: #E24B4A; margin-right: 2px; }
+.dispatch-form-select, .dispatch-form-textarea {
+  width: 100%; padding: 7px 10px; border-radius: 4px;
+  border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04);
+  color: #E8F4FF; font-size: 12px; font-family: inherit; outline: none;
+  transition: border-color .2s;
+}
+.dispatch-form-select:focus, .dispatch-form-textarea:focus { border-color: rgba(255,149,0,.5); }
+.dispatch-form-select option { background: #0a1628; color: #E8F4FF; }
+.dispatch-form-textarea { resize: vertical; }
+.video-slot {
+  aspect-ratio: 16/9; background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.08); border-radius: 4px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* 趋势图容器 */
+.trend-chart {
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 4px;
+  padding: 6px;
+}
+.trend-chart canvas { width: 100%; height: 80px; display: block; }
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div id="topbar">
+  <div class="logo">智慧消防</div>
+  <div class="mode-tabs">
+    <a class="mode-tab" href="cruise.html">巡航</a>
+    <a class="mode-tab" href="alarm.html">报警</a>
+    <a class="mode-tab active" href="emergency.html">应急指挥</a>
+    <a class="mode-tab" href="office.html">安全办公</a>
+  </div>
+  <div id="clock">--:--:--</div>
+</div>
+
+<!-- ══ ALARM BANNER ══ -->
+<div id="alarm-banner" class="show">
+  <span class="ab-pulse"></span>
+  <span class="ab-title">应急指挥模式已激活</span>
+  <span class="ab-info">B1层 · 手动报警按钮 MCP-B1-003 触发 · 14:32:18</span>
+  <button class="ab-btn" onclick="showToast('已确认告警')">确认告警</button>
+  <button class="ab-btn g" onclick="showToast('已接管指挥权')">接管指挥</button>
+</div>
+
+<!-- ══ MAIN VIEW ══ -->
+<div id="main-view">
+  <canvas id="three-canvas"></canvas>
+  <div id="xray-badge">X-RAY 透视模式</div>
+  <div id="help-tip">左键旋转 · 滚轮缩放 · 右键平移<br>双击楼层 → 进入楼层详情</div>
+</div>
+
+<!-- ══ FLOAT COL ══ -->
+<div id="float-col">
+  <button class="fb" id="fb-scene" onclick="togglePanel('scene')" title="场景模式"><span>🏢</span><span class="fb-lbl">场景</span></button>
+  <button class="fb" id="fb-layer" onclick="togglePanel('layer')" title="图层"><span>🗂</span><span class="fb-lbl">图层</span></button>
+  <button class="fb" id="fb-view"  onclick="togglePanel('view')"  title="视图"><span>🔳</span><span class="fb-lbl">视图</span></button>
+  <div class="fb-div"></div>
+  <button class="fb" id="fb-floor" onclick="togglePanel('floor')" title="楼层"><span>📐</span><span class="fb-lbl">楼层</span></button>
+  <div class="fb-div" style="margin-top:auto"></div>
+  <button class="fb" onclick="resetCamera();showToast('视角已复原')" title="复原"><span>⟳</span><span class="fb-lbl">复原</span></button>
+</div>
+
+<!-- Scene Panel -->
+<div class="fpanel" id="panel-scene">
+  <div class="fp-ttl">场景模式</div>
+  <div class="sc-btn" id="sb-cruise" onclick="setMode('cruise',null);closePanels()">
+    <span class="sc-ico">◎</span>
+    <div><div class="sc-nm">巡航模式</div><div class="sc-ds">全楼层设备状态巡视</div><div class="sc-user">↳ 消控室值班员</div></div>
+  </div>
+  <div class="sc-btn alarm-s" id="sb-alarm" onclick="setMode('alarm',null);closePanels()">
+    <span class="sc-ico">⚠</span>
+    <div><div class="sc-nm">报警响应</div><div class="sc-ds">事件联动·逃生路径·人员热力</div><div class="sc-user">↳ 消控室 · 安全管理员</div></div>
+  </div>
+  <div class="sc-btn active" id="sb-command" onclick="setMode('command',null);closePanels()">
+    <span class="sc-ico">◈</span>
+    <div><div class="sc-nm">应急指挥</div><div class="sc-ds">X-Ray透视·危险品分布·全图层联动</div><div class="sc-user">↳ 应急指挥中心 · 消防队</div></div>
+  </div>
+  <div class="sc-btn" id="sb-office" onclick="setMode('office',null);closePanels()">
+    <span class="sc-ico">◧</span>
+    <div><div class="sc-nm">安全办公</div><div class="sc-ds">巡检计划·合规审查·台账与报表</div><div class="sc-user">↳ 安全办公室 · 楼管</div></div>
+  </div>
+</div>
+
+<!-- Layer Panel -->
+<div class="fpanel" id="panel-layer">
+  <div class="fp-ttl">图层控制</div>
+  <div class="lp-preset">
+    <div style="font-size:9.5px;color:rgba(232,244,255,.38);margin-bottom:4px">快速预设</div>
+    <div class="lp-pgrid">
+      <div class="lp-pb" onclick="applyPreset('daily')">日常巡检</div>
+      <div class="lp-pb" onclick="applyPreset('war')">战时指挥</div>
+      <div class="lp-pb" onclick="applyPreset('drill')">推演分析</div>
+      <div class="lp-pb" onclick="applyPreset('patrol')">巡检模式</div>
+    </div>
+  </div>
+  <div id="layer-list-inner"></div>
+</div>
+
+<!-- View Panel -->
+<div class="fpanel" id="panel-view">
+  <div class="fp-ttl">3D 视图</div>
+  <div class="vo active" id="vo-std" onclick="setView('standard');closePanels()">
+    <span class="vo-ico">⬜</span><div><div class="vo-nm">标准 3D</div><div class="vo-ds">半透明外立面 · 全楼层</div></div>
+  </div>
+  <div class="vo" id="vo-xray" onclick="setView('xray');closePanels()">
+    <span class="vo-ico">⬡</span><div><div class="vo-nm">X-Ray 透视</div><div class="vo-ds">线框结构 · 管网可见</div></div>
+  </div>
+  <div style="height:1px;background:rgba(255,149,0,.1);margin:4px 10px"></div>
+  <div class="fp-ttl" style="padding-top:8px">终端适配</div>
+  <div class="vo disabled" onclick="showToast('平板模式开发中，敬请期待')">
+    <span class="vo-ico">▭</span><div><div class="vo-nm">平板模式</div><div class="vo-ds">触控优化 · 竖屏适配</div></div><span class="soon-tag">规划中</span>
+  </div>
+  <div class="vo disabled" onclick="showToast('视频墙模式开发中，敬请期待')">
+    <span class="vo-ico">⊞</span><div><div class="vo-nm">视频墙</div><div class="vo-ds">多屏拼接 · 指挥大屏</div></div><span class="soon-tag">规划中</span>
+  </div>
+</div>
+
+<!-- Floor Panel -->
+<div class="fpanel" id="panel-floor">
+  <div class="fp-ttl">楼层概览</div>
+  <div id="floor-list-inner"></div>
+</div>
+
+<div id="panel-overlay" onclick="closePanels()"></div>
+
+<!-- ══ BOTTOM BAR - 实时监控轮播 ══ -->
+<div id="bottombar" style="height:120px;align-items:stretch;padding:6px 14px;gap:10px;">
+  <div style="display:flex;align-items:center;flex-shrink:0;padding-right:12px;border-right:1px solid rgba(255,149,0,.15);">
+    <div style="font-size:11px;font-weight:600;color:#E8F4FF;letter-spacing:1px;">B1层</div>
+    <div style="font-size:9px;color:rgba(232,244,255,.4);margin-top:2px;">实时监控</div>
+  </div>
+  <div class="camera-scroll-container" id="cameraScroll">
+    <div class="camera-scroll-track">
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-01 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-01 · 入口通道</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-02 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-02 · 设备机房</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-03 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-03 · 停车场</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-04 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-04 · 电梯厅</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-05 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-05 · 走廊东侧</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-06 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-06 · 走廊西侧</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-07 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-07 · 消防通道</div>
+      </div>
+      <div class="camera-feed" onclick="showToast('正在调取 CAM-B1-08 画面')">
+        <div class="camera-feed-placeholder"><span style="font-size:20px;opacity:.2">📹</span></div>
+        <div class="camera-feed-label">CAM-B1-08 · 配电间</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Smoke Timeline -->
+<div id="smoke-tl" class="show">
+  <span class="stl-lbl">🔴 烟气推演 T+</span>
+  <div style="display:flex;gap:4px">
+    <button class="stl-btn active" onclick="setSmokeTime(0)">0</button>
+    <button class="stl-btn" onclick="setSmokeTime(1)">+1min</button>
+    <button class="stl-btn" onclick="setSmokeTime(3)">+3min</button>
+    <button class="stl-btn" onclick="setSmokeTime(5)">+5min</button>
+    <button class="stl-btn" onclick="setSmokeTime(10)">+10min</button>
+  </div>
+  <span class="stl-lbl" style="font-size:8.5px;color:rgba(255,107,53,.5)">AI推演·非实测</span>
+</div>
+
+<!-- ══ FLOOR DETAIL VIEW ══ -->
+<div id="floor-view">
+  <div id="fv-header">
+    <span id="fv-floor-label">3F</span>
+    <span style="color:rgba(74,144,217,.3)">·</span>
+    <span id="fv-floor-sub">楼层详情</span>
+    <button class="fv-back-btn" onclick="closeFloorDetail()">← 返回总览</button>
+  </div>
+  <div id="fv-body">
+    <div id="fv-canvas-wrap">
+      <canvas id="floor-plan-canvas"></canvas>
+      <div id="eagle-eye">
+        <div id="eagle-hdr" onclick="closeFloorDetail()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(74,144,217,.85)" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <span id="eagle-hdr-lbl">总体鹰眼</span>
+          <span class="eagle-back">返回总览</span>
+        </div>
+        <img id="bldg-thumb" src="" alt="">
+        <div id="eagle-floor-list"></div>
+      </div>
+      <div id="fv-tip">拖拽旋转 · 滚轮缩放 · 双击复位<br>移入图标查看信息</div>
+    </div>
+  </div>
+</div>
+
+<!-- Hover Card -->
+<div id="hcard"></div>
+<!-- Toast -->
+<div id="toast"></div>
+
+
+<!-- ════════════════════════════════════════════════
+     应急指挥模式一期 - 左侧信息窗
+     ════════════════════════════════════════════════ -->
+<div class="left-info-panel">
+
+  <!-- 卡片1：告警详情摘要 -->
+  <div class="glass-card">
+    <div class="glass-card-title">
+      <h3>告警详情</h3>
+      <span class="card-tag red">火警</span>
+    </div>
+    <div class="alarm-detail-row"><span class="alarm-detail-label">设备名称</span><span class="alarm-detail-value err">MCP-B1-003</span></div>
+    <div class="alarm-detail-row"><span class="alarm-detail-label">设备类型</span><span class="alarm-detail-value">手动报警按钮</span></div>
+    <div class="alarm-detail-row"><span class="alarm-detail-label">告警时间</span><span class="alarm-detail-value">14:32:18</span></div>
+    <div class="alarm-detail-row"><span class="alarm-detail-label">告警内容</span><span class="alarm-detail-value err">手动触发 · 疑似火情</span></div>
+    <div class="alarm-detail-row"><span class="alarm-detail-label">安装位置</span><span class="alarm-detail-value">B1层 · 停车场/设备机房</span></div>
+
+    <!-- 仅展示报警设备监测值 -->
+    <div style="font-size:10px;color:rgba(232,244,255,.4);margin:10px 0 6px;">异常监测值</div>
+    <div class="monitor-grid">
+      <div class="monitor-item"><span class="monitor-dot err"></span><span class="monitor-name">温度</span><span class="monitor-val" style="color:#E24B4A">67.2°C</span></div>
+      <div class="monitor-item"><span class="monitor-dot err"></span><span class="monitor-name">烟雾浓度</span><span class="monitor-val" style="color:#E24B4A">0.32dB/m</span></div>
+    </div>
+
+    <!-- 设备报警趋势图 -->
+    <div style="font-size:10px;color:rgba(232,244,255,.4);margin:10px 0 6px;">报警趋势（近24h）</div>
+    <div class="trend-chart">
+      <canvas id="trendCanvas" width="270" height="80"></canvas>
+    </div>
+
+    <!-- 紧急联系人 -->
+    <div style="font-size:10px;color:rgba(232,244,255,.4);margin:12px 0 6px;">紧急联系人</div>
+    <div class="contact-list" style="margin:0;">
+      <div class="contact-item" onclick="showToast('正在呼叫张明远...')">
+        <div class="contact-avatar">张</div>
+        <div class="contact-info"><div class="contact-name">张明远</div><div class="contact-role">值班长 · 138****8888</div></div>
+        <span class="contact-action">📞</span>
+      </div>
+      <div class="contact-item" onclick="showToast('正在呼叫李建国...')">
+        <div class="contact-avatar">李</div>
+        <div class="contact-info"><div class="contact-name">李建国</div><div class="contact-role">物业经理 · 139****5555</div></div>
+        <span class="contact-action">📞</span>
+      </div>
+      <div class="contact-item" onclick="showToast('正在呼叫王芳...')">
+        <div class="contact-avatar">王</div>
+        <div class="contact-info"><div class="contact-name">王芳</div><div class="contact-role">消防专管员 · 137****2222</div></div>
+        <span class="contact-action">📞</span>
+      </div>
+    </div>
+    <button class="card-action" style="margin-top:8px;" onclick="openModal('modal-dispatch-emergency')">📡 一键调度</button>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════════════════════
+     应急指挥模式 - 右侧应急通讯悬浮卡片
+     ════════════════════════════════════════════════ -->
+<div class="emergency-float-cards">
+  <!-- 119 消防队 -->
+  <div class="emergency-float-card fire-card">
+    <div class="efc-header">
+      <span style="font-size:18px">🚒</span>
+      <div style="flex:1">
+        <div class="efc-name">朝阳消防中队</div>
+        <div class="efc-status">出动中</div>
+      </div>
+    </div>
+    <div class="efc-countdown" id="eta-countdown">7:22</div>
+    <div class="efc-label">预计到场</div>
+  </div>
+
+  <!-- 120 急救 -->
+  <div class="emergency-float-card med-card">
+    <div class="efc-header">
+      <span style="font-size:18px">🚑</span>
+      <div style="flex:1">
+        <div class="efc-name" style="color:#4CAF50;">120 急救中心</div>
+        <div class="efc-status" style="color:rgba(76,175,80,.7);">已出发</div>
+      </div>
+    </div>
+    <div class="efc-countdown" id="eta-countdown-120" style="color:#4CAF50;">12:05</div>
+    <div class="efc-label">预计到场</div>
+  </div>
+</div>
+
+<!-- 设备监测报警弹窗 -->
+<div class="modal-overlay" id="modal-device-alarm">
+  <div class="modal-box">
+    <div class="modal-header"><h3>设备监测报警</h3><button class="modal-close" onclick="closeModal('device-alarm')">×</button></div>
+    <div class="modal-body">
+      <div class="detail-row"><span class="detail-label">报警设备</span><span class="detail-value">MCP-B1-003</span></div>
+      <div class="detail-row"><span class="detail-label">设备类型</span><span class="detail-value">手动报警按钮</span></div>
+      <div class="detail-row"><span class="detail-label">安装位置</span><span class="detail-value">B1层 · 停车场/设备机房</span></div>
+      <div class="detail-row"><span class="detail-label">报警状态</span><span class="detail-value err">火警</span></div>
+      <div class="detail-row"><span class="detail-label">报警时间</span><span class="detail-value warn">2024-04-28 14:32:18</span></div>
+      <div class="detail-row"><span class="detail-label">温度读数</span><span class="detail-value err">67.2°C（异常）</span></div>
+      <div class="detail-row"><span class="detail-label">烟雾浓度</span><span class="detail-value err">0.32dB/m（超标）</span></div>
+      <div class="detail-row"><span class="detail-label">水压</span><span class="detail-value ok">0.82 MPa（正常）</span></div>
+      <div class="detail-row"><span class="detail-label">消防电源</span><span class="detail-value ok">正常供电</span></div>
+      <div class="detail-row"><span class="detail-label">同楼层摄像头</span><span class="detail-value">CAM-B1-01 · 已调取</span></div>
+      <div class="detail-row"><span class="detail-label">建议措施</span><span class="detail-value">立即启动应急预案 · 联系消防队</span></div>
+      <div style="margin-top:14px;display:flex;gap:8px;">
+        <button class="card-action" style="flex:1;padding:8px;margin:0;" onclick="closeModal('device-alarm');showToast('已派单维修')">派单维修</button>
+        <button class="card-action" style="flex:1;padding:8px;margin:0;border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(232,244,255,.5);" onclick="closeModal('device-alarm')">暂时忽略</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 应急调度弹窗 -->
+<div class="modal-overlay" id="modal-dispatch-emergency">
+  <div class="modal-box" style="width:620px;">
+    <div class="modal-header"><h3>应急调度</h3><button class="modal-close" onclick="closeModal('dispatch-emergency')">×</button></div>
+    <div class="modal-body">
+      <div style="display:flex;gap:16px;margin-bottom:14px;padding:10px 12px;background:rgba(226,75,74,.06);border:1px solid rgba(226,75,74,.15);border-radius:6px;">
+        <div style="flex:1;">
+          <div style="font-size:9px;color:rgba(232,244,255,.4);margin-bottom:2px;">调度编号</div>
+          <div style="font-size:12px;color:#E8F4FF;font-family:'JetBrains Mono',monospace;">DSP-20260505-001</div>
+        </div>
+        <div style="flex:1;">
+          <div style="font-size:9px;color:rgba(232,244,255,.4);margin-bottom:2px;">调度主题</div>
+          <div style="font-size:12px;color:#E8F4FF;">B1层火情应急调度</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px;">
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+        <div class="video-slot"><div style="font-size:18px;opacity:.2">▶</div></div>
+      </div>
+      <div class="dispatch-form-group">
+        <label class="dispatch-form-label">调度说明</label>
+        <textarea class="dispatch-form-textarea" rows="3" placeholder="请输入调度说明..."></textarea>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;padding:0 20px 20px;">
+      <div style="display:flex;gap:8px;">
+        <button class="card-action" style="width:auto;padding:6px 14px;margin:0;border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(232,244,255,.5);" onclick="showToast('已静音')">🔇 关闭声音</button>
+        <button class="card-action" style="width:auto;padding:6px 14px;margin:0;border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.03);color:rgba(232,244,255,.5);" onclick="showToast('视频已开启')">📹 开启视频</button>
+      </div>
+      <button class="card-action" style="width:auto;padding:6px 20px;margin:0;" onclick="showToast('调度已发起');closeModal('dispatch-emergency')">发起调度</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  数据定义（底座完整保留）
+// ════════════════════════════════════════════════
+const FLOORS=[
+  {id:0,label:'B1',y:-3.5,h:3.5,people:12, devices:24,status:'alarm', theme:'停车场/设备机房',   alarmText:'手动报警按钮 MCP-B1-003 触发'},
+  {id:1,label:'1F',y:0,   h:4.0,people:25, devices:38,status:'normal',theme:'门厅/接待区/消控室', alarmText:''},
+  {id:2,label:'2F',y:4.0, h:3.6,people:47, devices:42,status:'normal',theme:'开放办公区A/B',       alarmText:''},
+  {id:3,label:'3F',y:7.6, h:3.6,people:84, devices:50,status:'warn',  theme:'大会议室/小会议室×3',alarmText:'感烟探测器 S3-NE-047 离线'},
+  {id:4,label:'4F',y:11.2,h:3.6,people:61, devices:45,status:'normal',theme:'独立办公室×4/开放区', alarmText:''},
+  {id:5,label:'5F',y:14.8,h:3.6,people:38, devices:40,status:'normal',theme:'餐厅/厨房/休息室',    alarmText:''},
+];
+
+const LAYERS=[
+  {id:'L0', name:'建筑基础白模',   color:'#A0B8D0',on:true, locked:true},
+  {id:'L3', name:'视频监控点位',   color:'#9C88FF',on:false},
+  {id:'L4', name:'人员热力定位',   color:'#FFC107',on:false},
+  {id:'L5', name:'逃生路径',       color:'#4CAF50',on:false},
+  {id:'L6', name:'烟气蔓延推演',   color:'#E24B4A',on:false},
+  {id:'L7', name:'危险品分布',     color:'#FF6B35',on:false},
+  {id:'L8', name:'消防管网水系',   color:'#29B6F6',on:false},
+  {id:'LA', name:'独立式温感系统', color:'#FF9060',on:true,  icon:'🌡'},
+  {id:'LB', name:'火灾报警系统',   color:'#FF4444',on:true,  icon:'🔔'},
+  {id:'LC', name:'电气火灾系统',   color:'#FFD700',on:false, icon:'⚡'},
+  {id:'LD', name:'可燃气体系统',   color:'#80FF80',on:false, icon:'💨'},
+  {id:'LE', name:'防排烟系统',     color:'#40C8FF',on:false, icon:'🌀'},
+  {id:'LF', name:'防火门控系统',   color:'#FF80C0',on:false, icon:'🚪'},
+  {id:'LG', name:'其他控制系统',   color:'#A0A0C0',on:false, icon:'⚙'},
+  {id:'LH', name:'巡检点',         color:'#80FFFF',on:false, icon:'📍'},
+  {id:'LI', name:'巡检路线',       color:'#40A0FF',on:false},
+];
+
+const LAYER_ICONS={
+  LA:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="14"/><circle cx="12" cy="18" r="4"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="14" y1="10" x2="16" y2="10"/></svg>',
+  LB:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><line x1="12" y1="22" x2="12" y2="22" stroke-width="4"/></svg>',
+  LC:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  LD:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 8 Q6 5 9 8 Q12 11 15 8 Q18 5 21 8"/><path d="M3 14 Q6 11 9 14 Q12 17 15 14 Q18 11 21 14"/></svg>',
+  LE:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M12 10 C10 7 6 7 6 10 C6 12 10 12 12 12"/><path d="M12 12 C15 11 16 7 14 6 C12 5 11 9 12 12"/><path d="M12 12 C11 15 14 18 16 16 C18 14 14 13 12 12"/></svg>',
+  LF:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="2" width="18" height="20" rx="1"/><line x1="12" y1="2" x2="12" y2="22"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/></svg>',
+  LG:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>',
+  LH:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 22s-8-6.686-8-12a8 8 0 1 1 16 0c0 5.314-8 12-8 12z"/><circle cx="12" cy="10" r="3"/></svg>',
+};
+
+const PRESETS={
+  daily: ['L0','LB','LA'],
+  war:   ['L0','LB','L4','L5','L7','LC'],
+  drill: ['L0','L4','L5','L6','L7'],
+  patrol:['L0','LB','LH','LI'],
+};
+
+const MODE_CFG={
+  cruise:  {on:['L0','LB','LA'],       auto:[]},
+  alarm:   {on:['L0','LB','LA'],       auto:['L3','L4','L5','LE','LF']},
+  command: {on:['L0','LB'],            auto:['L4','L5','L7','L8','LE']},
+  public:  {on:['L0','L4'],            auto:['L5']},
+  office:  {on:['L0','LB','LA'],       auto:['LH','LI']},
+};
+
+const FLOOR_ROOMS={
+  0:[[5,5,55,60,'地下停车场','parking'],[62,5,33,30,'设备机房','control'],[62,37,16,28,'配电室','control'],[80,37,15,28,'危险品库','danger'],[5,67,90,8,'通道','corridor'],[5,77,43,18,'消防水泵房','control'],[50,77,45,18,'消防水箱间','control']],
+  1:[[5,5,40,34,'接待大厅','lobby'],[47,5,48,34,'等候区','office'],[5,41,20,38,'消防控制室','control'],[27,41,68,10,'走廊','corridor'],[27,53,35,22,'会客室A','meeting'],[64,53,31,22,'会客室B','meeting'],[5,77,90,8,'消防通道','corridor']],
+  2:[[5,5,42,44,'开放办公区A','office'],[49,5,46,44,'开放办公区B','office'],[5,51,30,18,'会议室2-A','meeting'],[37,51,25,18,'会议室2-B','meeting'],[64,51,31,18,'储藏室','storage'],[5,71,90,9,'走廊','corridor'],[5,82,43,12,'茶水间','utility'],[50,82,45,12,'卫生间','utility']],
+  3:[[5,5,58,42,'大会议室（100人）','meeting-large'],[65,5,30,42,'小会议室3-A','meeting'],[5,49,28,22,'小会议室3-B','meeting'],[35,49,28,22,'小会议室3-C','meeting'],[65,49,30,22,'休息等候区','office'],[5,73,90,9,'走廊','corridor'],[5,84,60,11,'文印/茶水间','utility'],[67,84,28,11,'楼梯间','corridor']],
+  4:[[5,5,20,42,'独立办公4-A','office'],[27,5,20,42,'独立办公4-B','office'],[49,5,20,42,'独立办公4-C','office'],[71,5,24,42,'独立办公4-D','office'],[5,49,90,22,'开放办公区','office'],[5,73,90,9,'走廊','corridor'],[5,84,90,11,'公共区域','utility']],
+  5:[[5,5,55,44,'员工餐厅','office'],[62,5,33,44,'厨房','kitchen'],[5,51,35,22,'休息室A','meeting'],[42,51,30,22,'休息室B','meeting'],[74,51,21,22,'储藏间','storage'],[5,75,90,9,'走廊','corridor'],[5,86,90,9,'楼梯/电梯间','corridor']],
+};
+
+const ESCAPE_ROUTES={
+  3:[[{x:34,y:46},{x:34,y:77},{x:88,y:77},{x:88,y:95}],[{x:34,y:46},{x:34,y:77},{x:8,y:77},{x:8,y:95}]],
+  2:[[{x:28,y:49},{x:28,y:75},{x:88,y:75},{x:88,y:95}],[{x:72,y:49},{x:72,y:75},{x:8,y:75},{x:8,y:95}]],
+  1:[[{x:50,y:39},{x:50,y:45},{x:88,y:45},{x:88,y:85}],[{x:18,y:39},{x:18,y:45},{x:8,y:45},{x:8,y:85}]],
+  0:[[{x:30,y:65},{x:30,y:71},{x:88,y:71},{x:88,y:95}],[{x:30,y:65},{x:30,y:71},{x:8,y:71},{x:8,y:95}]],
+};
+
+let layerState={};
+LAYERS.forEach(l=>{ layerState[l.id]=l.on; });
+let currentMode='command', currentView='standard', smokeTime=0;
+let selectedFloor=-1, openPanel=null, pulse=0;
+
+// ════════════════════════════════════════════════
+//  Three.js 主场景（底座完整保留）
+// ════════════════════════════════════════════════
+const canvas3d=document.getElementById('three-canvas');
+const mainView=document.getElementById('main-view');
+const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060D18);
+scene.fog=new THREE.FogExp2(0x060D18,0.013);
+
+const camera=new THREE.PerspectiveCamera(50,1,0.1,500);
+let sph={theta:0.8,phi:0.82,r:42};
+let tgt=new THREE.Vector3(0,8,0);
+function updateCamera(){
+  camera.position.set(tgt.x+sph.r*Math.sin(sph.phi)*Math.sin(sph.theta),tgt.y+sph.r*Math.cos(sph.phi),tgt.z+sph.r*Math.sin(sph.phi)*Math.cos(sph.theta));
+  camera.lookAt(tgt);
+}
+updateCamera();
+
+scene.add(new THREE.AmbientLight(0x1A2F4A,1.6));
+const sunL=new THREE.DirectionalLight(0x4A90D9,0.9);
+sunL.position.set(15,30,20);sunL.castShadow=true;scene.add(sunL);
+const fillL=new THREE.DirectionalLight(0x1A3A5A,0.4);fillL.position.set(-10,20,-10);scene.add(fillL);
+
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x080F1A}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-0.05;scene.add(ground);
+const grid=new THREE.GridHelper(120,60,0x1A3A5A,0x0D2035);
+grid.material.transparent=true;grid.material.opacity=0.4;scene.add(grid);
+
+const BW=16,BD=12;
+const floorGroups=[],floorMeshes=[];
+const allSprites=[];
+const routeMeshes=[],routeMats=[];
+const smokeMeshes=[],smokeMats=[];
+const heatMeshes=[],heatMats=[];
+const camMeshes=[],camMats=[];
+const pipeMeshes=[],pipeMats=[];
+const dangerMeshes=[],dangerMats=[];
+const patrolPoints=[],patrolRoutes=[];
+
+FLOORS.forEach((fl,idx)=>{
+  const grp=new THREE.Group();
+  const slabM=new THREE.MeshStandardMaterial({color:0x2A4060,transparent:true,opacity:0.75});
+  const slab=new THREE.Mesh(new THREE.BoxGeometry(BW,0.2,BD),slabM);
+  slab.position.y=fl.y;grp.add(slab);
+  const wallM=new THREE.MeshStandardMaterial({color:0x1E3348,transparent:true,opacity:0.26,roughness:0.6,metalness:0.2,side:THREE.DoubleSide,depthWrite:false});
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(BW,fl.h-0.2,BD),wallM);
+  wall.position.y=fl.y+fl.h/2;
+  wall.userData={type:'floor',floorId:fl.id,label:fl.label};
+  grp.add(wall);
+  const edgeG=new THREE.EdgesGeometry(new THREE.BoxGeometry(BW,fl.h,BD));
+  const edgeM=new THREE.LineBasicMaterial({color:0x4A90D9,transparent:true,opacity:0.4});
+  const edges=new THREE.LineSegments(edgeG,edgeM);
+  edges.position.y=fl.y+fl.h/2;grp.add(edges);
+  const xrayM=new THREE.LineBasicMaterial({color:0x1A9BCB,transparent:true,opacity:0});
+  const xray=new THREE.LineSegments(edgeG.clone(),xrayM);
+  xray.position.y=fl.y+fl.h/2;grp.add(xray);
+  floorGroups.push(grp);
+  floorMeshes.push({grp,slab,slabM,wall,wallM,edges,edgeM,xray,xrayM,fl});
+  scene.add(grp);
+});
+
+function drawLineIcon(ctx, type){
+  const c=64, r=32;
+  ctx.strokeStyle='rgba(255,255,255,0.95)';
+  ctx.lineWidth=6; ctx.lineCap='round'; ctx.lineJoin='round';
+  switch(type){
+    case 'LA':{ctx.beginPath();ctx.moveTo(c,c-r);ctx.lineTo(c,c+r*0.28);ctx.stroke();ctx.beginPath();ctx.arc(c,c+r*0.52,r*0.22,0,Math.PI*2);ctx.stroke();[[c+r*0.15,c-r*0.55],[c+r*0.15,c-r*0.2],[c+r*0.15,c+r*0.1]].forEach(([x,y])=>{ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+r*0.38,y);ctx.stroke();});break;}
+    case 'LB':{ctx.beginPath();ctx.arc(c,c-r*0.1,r*0.55,Math.PI*1.12,Math.PI*1.88);ctx.lineTo(c+r*0.55,c+r*0.38);ctx.stroke();ctx.beginPath();ctx.moveTo(c-r*0.6,c+r*0.38);ctx.lineTo(c+r*0.6,c+r*0.38);ctx.stroke();ctx.beginPath();ctx.arc(c,c+r*0.62,r*0.12,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.arc(c,c-r*0.78,r*0.1,Math.PI,0);ctx.stroke();break;}
+    case 'LC':{ctx.beginPath();ctx.moveTo(c+r*0.18,c-r);ctx.lineTo(c-r*0.22,c+r*0.08);ctx.lineTo(c+r*0.05,c+r*0.08);ctx.lineTo(c-r*0.18,c+r);ctx.stroke();break;}
+    case 'LD':{[-0.38,0,0.38].forEach(dy=>{ctx.beginPath();ctx.moveTo(c-r*0.55,c+dy*r);ctx.quadraticCurveTo(c-r*0.18,c+dy*r-r*0.22,c,c+dy*r);ctx.quadraticCurveTo(c+r*0.18,c+dy*r+r*0.22,c+r*0.55,c+dy*r);ctx.stroke();});break;}
+    case 'LE':{for(let i=0;i<3;i++){ctx.save();ctx.translate(c,c);ctx.rotate(i*Math.PI*2/3);ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-r*0.62);ctx.arc(-r*0.24,-r*0.6,r*0.24,-Math.PI/2,Math.PI*0.55);ctx.stroke();ctx.restore();}ctx.beginPath();ctx.arc(c,c,r*0.13,0,Math.PI*2);ctx.stroke();break;}
+    case 'LF':{ctx.beginPath();ctx.rect(c-r*0.48,c-r*0.72,r*0.96,r*1.38);ctx.stroke();ctx.beginPath();ctx.moveTo(c,c-r*0.72);ctx.lineTo(c,c+r*0.66);ctx.stroke();ctx.beginPath();ctx.arc(c-r*0.14,c+r*0.02,r*0.09,0,Math.PI*2);ctx.stroke();break;}
+    case 'LG':{ctx.beginPath();ctx.arc(c,c,r*0.3,0,Math.PI*2);ctx.stroke();for(let i=0;i<8;i++){ctx.save();ctx.translate(c,c);ctx.rotate(i*Math.PI/4);ctx.beginPath();ctx.moveTo(0,-r*0.3);ctx.lineTo(0,-r*0.62);ctx.stroke();ctx.restore();}break;}
+    case 'LH':{ctx.beginPath();ctx.arc(c,c-r*0.2,r*0.38,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(c-r*0.38*Math.cos(Math.PI/6),c-r*0.2+r*0.38*Math.sin(Math.PI/6));ctx.lineTo(c,c+r*0.78);ctx.lineTo(c+r*0.38*Math.cos(Math.PI/6),c-r*0.2+r*0.38*Math.sin(Math.PI/6));ctx.stroke();ctx.beginPath();ctx.arc(c,c-r*0.2,r*0.12,0,Math.PI*2);ctx.stroke();break;}
+    case 'camera':{ctx.beginPath();ctx.rect(c-r*0.6,c-r*0.38,r*1.2,r*0.78);ctx.stroke();ctx.beginPath();ctx.arc(c,c,r*0.26,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(c-r*0.22,c-r*0.38);ctx.lineTo(c-r*0.22,c-r*0.6);ctx.lineTo(c+r*0.22,c-r*0.6);ctx.lineTo(c+r*0.22,c-r*0.38);ctx.stroke();break;}
+    case 'danger':{ctx.beginPath();ctx.moveTo(c,c-r);ctx.lineTo(c+r*0.88,c+r*0.5);ctx.lineTo(c-r*0.88,c+r*0.5);ctx.closePath();ctx.stroke();ctx.beginPath();ctx.moveTo(c,c-r*0.28);ctx.lineTo(c,c+r*0.2);ctx.stroke();ctx.beginPath();ctx.arc(c,c+r*0.38,r*0.07,0,Math.PI*2);ctx.fill();break;}
+    default:{ctx.beginPath();ctx.arc(c,c,r*0.5,0,Math.PI*2);ctx.stroke();ctx.beginPath();ctx.moveTo(c-r*0.28,c-r*0.28);ctx.lineTo(c+r*0.28,c+r*0.28);ctx.moveTo(c+r*0.28,c-r*0.28);ctx.lineTo(c-r*0.28,c+r*0.28);ctx.stroke();}
+  }
+}
+
+function makeIconSprite(iconType,bgColor,size,ud){
+  const cv=document.createElement('canvas'); cv.width=cv.height=128;
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle=bgColor;
+  ctx.beginPath();ctx.arc(64,64,58,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(64,64,58,0,Math.PI*2);ctx.stroke();
+  drawLineIcon(ctx, iconType);
+  const tex=new THREE.CanvasTexture(cv);
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+  const sp=new THREE.Sprite(mat);
+  sp.scale.set(size,size,1);
+  if(ud) sp.userData=ud;
+  return sp;
+}
+
+const SYSTEM_CFG={
+  LA:{iconType:'LA',bg:'rgba(240,110,30,0.88)', size:0.75,yOff:0.5},
+  LB:{iconType:'LB',bg:'rgba(210,30,30,0.92)',  size:0.85,yOff:0.8},
+  LC:{iconType:'LC',bg:'rgba(180,140,0,0.88)',  size:0.75,yOff:0.6},
+  LD:{iconType:'LD',bg:'rgba(30,160,60,0.88)',  size:0.75,yOff:0.5},
+  LE:{iconType:'LE',bg:'rgba(20,140,210,0.88)', size:0.85,yOff:0.9},
+  LF:{iconType:'LF',bg:'rgba(180,40,130,0.88)', size:0.8, yOff:0.6},
+  LG:{iconType:'LG',bg:'rgba(90,90,160,0.88)',  size:0.7, yOff:0.5},
+};
+const systemSprites={LA:[],LB:[],LC:[],LD:[],LE:[],LF:[],LG:[]};
+
+FLOORS.forEach(fl=>{
+  Object.entries(SYSTEM_CFG).forEach(([lid,cfg])=>{
+    const count=Math.floor((fl.devices/7)+1);
+    const seed=fl.id*100+lid.charCodeAt(1);
+    for(let i=0;i<count;i++){
+      const isAlarm=fl.status==='alarm'&&lid==='LB';
+      const bg=isAlarm?'rgba(200,20,20,0.95)':cfg.bg;
+      const sp=makeIconSprite(cfg.iconType,bg,cfg.size,{
+        type:'device',lid,floor:fl.label,floorId:fl.id,
+        status:isAlarm?'alarm':'normal',
+        id:`${fl.label}-${lid}-${String(i).padStart(2,'0')}`,
+        sysName:LAYERS.find(l=>l.id===lid)?.name||lid,
+      });
+      sp.position.set((((seed+i*73)%89+5)/100)*BW-BW/2,fl.y+fl.h*0.55+cfg.yOff,(((seed+i*53)%85+5)/100)*BD-BD/2);
+      scene.add(sp);systemSprites[lid].push(sp);allSprites.push(sp);
+    }
+  });
+});
+
+const patrolSprites=[];
+FLOORS.forEach(fl=>{
+  for(let i=0;i<3;i++){
+    const sp=makeIconSprite('LH','rgba(40,200,200,0.9)',0.7,{type:'patrol',floor:fl.label,floorId:fl.id,id:`PT-${fl.label}-${i+1}`,name:`巡检点 ${fl.label}-${i+1}`});
+    const s2=fl.id*50+i*17;
+    sp.position.set(((s2*31)%70+15)/100*BW-BW/2,fl.y+fl.h*0.55+0.5,(((s2+11)*41)%70+15)/100*BD-BD/2);
+    scene.add(sp);patrolSprites.push(sp);allSprites.push(sp);
+  }
+});
+
+const ROUTE_3D_DEFS=[
+  {pts:[[-2,9.0,-2.5],[-2,9.0,3.2],[6.5,9.0,3.2],[7.5,9.0,6.0]],color:0x4CAF50},
+  {pts:[[-2,9.0,-2.5],[-2,9.0,3.2],[-6.5,9.0,3.2],[-7.5,9.0,6.0]],color:0x2196F3},
+  {pts:[[2,5.6,0],[2,5.6,2.6],[6.5,5.6,2.6],[7.5,5.6,6.0]],color:0x4CAF50},
+  {pts:[[0,-1.5,0],[0,-1.5,2.2],[6.5,-1.5,2.2],[7.5,-1.5,6.0]],color:0xFF6B35},
+];
+ROUTE_3D_DEFS.forEach(def=>{
+  const pts=def.pts.map(p=>new THREE.Vector3(...p));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const mat=new THREE.MeshStandardMaterial({color:def.color,emissive:new THREE.Color(def.color),emissiveIntensity:1.5,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,40,0.07,6,false),mat);
+  mesh.userData={type:'route',status:'recommended',len:Math.round(pts.reduce((a,_,i)=>i?a+pts[i].distanceTo(pts[i-1]):a,0)*3)};
+  scene.add(mesh);routeMeshes.push(mesh);routeMats.push(mat);
+});
+
+[[0,-1.5,0,14,2.5,10],[0,2.5,0,10,2.5,8],[0,6,0,6,2.5,5]].forEach(d=>{
+  const mat=new THREE.MeshStandardMaterial({color:0x3D2B1F,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(d[3],d[4],d[5]),mat);
+  mesh.position.set(d[0],d[1],d[2]);scene.add(mesh);smokeMeshes.push(mesh);smokeMats.push(mat);
+});
+
+FLOORS.forEach(fl=>{
+  const d=fl.people/220,c=new THREE.Color();c.setHSL(0.6-d*0.52,0.85,0.4);
+  const mat=new THREE.MeshStandardMaterial({color:c,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(BW-1,BD-1),mat);
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(0,fl.y+0.18,0);
+  scene.add(mesh);heatMeshes.push(mesh);heatMats.push(mat);
+});
+
+[[7,10,5.5],[-7,10,5.5],[0,10,-5.5],[6,6.2,5.5],[-6,6.2,-5.5]].forEach((pos,i)=>{
+  const mat=new THREE.MeshStandardMaterial({color:0x9C88FF,emissive:0x4444AA,emissiveIntensity:0.6,transparent:true,opacity:0});
+  const m=new THREE.Mesh(new THREE.ConeGeometry(0.25,0.5,6),mat);
+  m.position.set(...pos);m.rotation.x=-Math.PI/4;
+  m.userData={type:'camera',id:`CAM-${i+1}`,floor:i<3?'3F':'2F'};
+  scene.add(m);camMeshes.push(m);camMats.push(mat);allSprites.push(m);
+});
+
+[[-7,0,0,-7,16,0],[7,0,0,7,16,0],[-7,4,0,7,4,0],[-7,8,0,7,8,0],[-7,12,0,7,12,0]].forEach(p=>{
+  const from=new THREE.Vector3(p[0],p[1],p[2]),to=new THREE.Vector3(p[3],p[4],p[5]);
+  const len=from.distanceTo(to);
+  const mat=new THREE.MeshStandardMaterial({color:0x1E4B7A,emissive:0x1E4B7A,emissiveIntensity:0.6,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,len,6),mat);
+  mesh.position.copy(from.clone().add(to).multiplyScalar(0.5));mesh.lookAt(to);mesh.rotateX(Math.PI/2);
+  scene.add(mesh);pipeMeshes.push(mesh);pipeMats.push(mat);
+});
+
+[[-5,-1.5,-3,0xE24B4A,'甲类危险品','乙醇 120L'],[3,-1.5,4,0x2196F3,'气瓶','氮气 4支'],[-2,3.8,-4,0xFFC107,'丙类危险品','纸箱堆放']].forEach((d,i)=>{
+  const mat=new THREE.MeshStandardMaterial({color:d[3],emissive:new THREE.Color(d[3]),emissiveIntensity:0.8,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.OctahedronGeometry(0.4),mat);
+  mesh.position.set(d[0],d[1],d[2]);mesh.userData={type:'danger',label:d[4],dtype:d[5]};
+  scene.add(mesh);dangerMeshes.push(mesh);dangerMats.push(mat);allSprites.push(mesh);
+});
+
+const patrolRouteMeshes=[];
+FLOORS.forEach(fl=>{
+  const pts=[new THREE.Vector3(-6,fl.y+fl.h*0.55+0.2,-4),new THREE.Vector3(0,fl.y+fl.h*0.55+0.2,-4),new THREE.Vector3(4,fl.y+fl.h*0.55+0.2,0),new THREE.Vector3(0,fl.y+fl.h*0.55+0.2,4),new THREE.Vector3(-6,fl.y+fl.h*0.55+0.2,4)];
+  const mat=new THREE.LineDashedMaterial({color:0x40A0FF,dashSize:0.4,gapSize:0.2,transparent:true,opacity:0,linewidth:2});
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat);
+  line.computeLineDistances();line.userData={type:'patrolRoute',floor:fl.label};
+  scene.add(line);patrolRouteMeshes.push(line);
+});
+
+// ════════════════════════════════════════════════
+//  相机控制（底座完整保留）
+// ════════════════════════════════════════════════
+let isDrag=false,isRDrag=false,lastM={x:0,y:0};
+canvas3d.addEventListener('mousedown',e=>{isDrag=true;isRDrag=e.button===2;lastM={x:e.clientX,y:e.clientY};canvas3d.style.cursor='grabbing';});
+window.addEventListener('mouseup',()=>{isDrag=false;canvas3d.style.cursor='default';});
+window.addEventListener('mousemove',e=>{
+  if(!isDrag)return;
+  const dx=e.clientX-lastM.x,dy=e.clientY-lastM.y;lastM={x:e.clientX,y:e.clientY};
+  if(isRDrag){tgt.x-=dx*.04;tgt.y+=dy*.04;}
+  else{sph.theta-=dx*.008;sph.phi=Math.max(.18,Math.min(1.42,sph.phi+dy*.008));}
+  updateCamera();
+});
+canvas3d.addEventListener('wheel',e=>{sph.r=Math.max(10,Math.min(90,sph.r+e.deltaY*.05));updateCamera();updateLOD();});
+canvas3d.addEventListener('contextmenu',e=>e.preventDefault());
+canvas3d.addEventListener('dblclick',e=>{
+  const hit=doRaycast(e);
+  if(hit?.userData?.type==='floor') openFloorDetail(hit.userData.floorId);
+  else resetCamera();
+});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){closePanels();forceHideCard();}});
+
+function animNum(obj,key,to,dur){
+  const from=obj[key],start=performance.now();
+  (function s(n){const t=Math.min((n-start)/dur,1),e=t<.5?2*t*t:-1+(4-2*t)*t;obj[key]=from+(to-from)*e;updateCamera();t<1&&requestAnimationFrame(s);})(start);
+}
+function animVec(vec,to,dur){
+  const fx=vec.x,fy=vec.y,fz=vec.z,start=performance.now();
+  (function s(n){const t=Math.min((n-start)/dur,1),e=t<.5?2*t*t:-1+(4-2*t)*t;vec.x=fx+(to.x-fx)*e;vec.y=fy+(to.y-fy)*e;vec.z=fz+(to.z-fz)*e;updateCamera();t<1&&requestAnimationFrame(s);})(start);
+}
+function resetCamera(){animNum(sph,'theta',0.8,500);animNum(sph,'phi',0.82,500);animNum(sph,'r',42,500);animVec(tgt,{x:0,y:8,z:0},500);}
+
+const raycaster=new THREE.Raycaster();
+const mouse2=new THREE.Vector2();
+function doRaycast(e){
+  const rect=canvas3d.getBoundingClientRect();
+  mouse2.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse2.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse2,camera);
+  const objs=[...floorMeshes.map(f=>f.wall),...allSprites,...routeMeshes,...smokeMeshes,...dangerMeshes];
+  const hits=raycaster.intersectObjects(objs,false);
+  return hits.length?hits[0].object:null;
+}
+
+function updateLOD(){
+  const lod=sph.r>50?1:sph.r>25?2:3;
+  document.getElementById('view-lbl').textContent=`${currentView==='xray'?'X-Ray':'标准3D'} · LOD-${lod}`;
+  const showSystems=['LA','LB','LC','LD','LE','LF','LG'];
+  showSystems.forEach(lid=>{systemSprites[lid].forEach(sp=>{sp.visible=layerState[lid]&&(lod===1?sp.userData.status==='alarm':true);});});
+  patrolSprites.forEach(sp=>{sp.visible=layerState['LH'];});
+}
+
+function setView(v){
+  currentView=v;
+  document.querySelectorAll('.vo').forEach(el=>el.classList.remove('active'));
+  document.getElementById(v==='xray'?'vo-xray':'vo-std').classList.add('active');
+  document.getElementById('xray-badge').classList.toggle('show',v==='xray');
+  if(v==='xray'){floorMeshes.forEach(fm=>{fm.wallM.opacity=0.04;fm.xrayM.opacity=0.8;fm.edgeM.color.set(0x1A9BCB);});showToast('X-Ray 透视模式');}
+  else{floorMeshes.forEach(fm=>{fm.wallM.opacity=0.26;fm.xrayM.opacity=0;fm.edgeM.color.set(0x4A90D9);});}
+  updateLOD();
+}
+
+function applyLayers(){
+  const showSys=['LA','LB','LC','LD','LE','LF','LG'];
+  showSys.forEach(lid=>systemSprites[lid].forEach(sp=>{sp.visible=layerState[lid];}));
+  patrolSprites.forEach(sp=>{sp.visible=layerState['LH'];});
+  patrolRouteMeshes.forEach(m=>{m.material.opacity=layerState['LI']?0.8:0;});
+  routeMats.forEach(m=>{m.opacity=layerState['L5']?0.85:0;});
+  smokeMats.forEach((m,i)=>{m.opacity=layerState['L6']?getSmokeOp(i):0;});
+  heatMats.forEach(m=>{m.opacity=layerState['L4']?0.4:0;});
+  camMats.forEach(m=>{m.opacity=layerState['L3']?0.85:0;});
+  pipeMats.forEach(m=>{m.opacity=layerState['L8']?0.65:0;});
+  dangerMats.forEach(m=>{m.opacity=layerState['L7']?0.9:0;});
+  updateLOD();
+  if(selectedFloor>=0) setTimeout(()=>drawFloorPlan(selectedFloor),80);
+}
+function getSmokeOp(i){return([0,0.35,0.58,0.72,0.85,0.92][Math.min(smokeTime,5)]||0)*(1-i*0.28);}
+
+function buildLayerList(){
+  const cfg=MODE_CFG[currentMode]||MODE_CFG.cruise;
+  document.getElementById('layer-list-inner').innerHTML=LAYERS.map(l=>`
+  <div class="lr" onclick="toggleLayer('${l.id}')">
+    <div class="lr-dot" style="background:${l.color};box-shadow:0 0 4px ${l.color}44"></div>
+    <span class="lr-nm">${LAYER_ICONS[l.id]||''} ${l.name}</span>
+    ${cfg.auto.includes(l.id)?'<span class="lr-tag a">自动</span>':''}
+    ${l.locked?'<span class="lr-tag">常驻</span>':''}
+    <div class="tsw ${layerState[l.id]?'on':''}" id="tsw-${l.id}"></div>
+  </div>`).join('');
+}
+function buildFloorList(){
+  const sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};
+  document.getElementById('floor-list-inner').innerHTML=[...FLOORS].reverse().map(fl=>`
+  <div class="fl-row" onclick="openFloorDetail(${fl.id});closePanels()">
+    <div class="lr-dot" style="background:${sc[fl.status]}"></div>
+    <div style="flex:1"><div style="font-size:11px;color:#E8F4FF">${fl.label}<span style="font-size:9px;color:rgba(232,244,255,.38);margin-left:4px">${fl.theme.split('/')[0]}</span></div>
+    <div style="font-size:9px;color:rgba(232,244,255,.38);margin-top:1px">${fl.people}人 · ${fl.devices}台</div></div>
+    <span style="font-size:9px;color:${sc[fl.status]}">${fl.status==='alarm'?'告警':fl.status==='warn'?'警告':'正常'}</span>
+  </div>`).join('');
+}
+function updateLayerUI(){
+  LAYERS.forEach(l=>{const e=document.getElementById(`tsw-${l.id}`);if(e)e.className=`tsw ${layerState[l.id]?'on':''}`;});
+}
+function toggleLayer(id){
+  if(LAYERS.find(l=>l.id===id)?.locked){showToast('该图层不可关闭');return;}
+  layerState[id]=!layerState[id];updateLayerUI();applyLayers();
+}
+function applyPreset(name){
+  const pts=PRESETS[name];if(!pts)return;
+  LAYERS.forEach(l=>{if(!l.locked)layerState[l.id]=pts.includes(l.id);});
+  updateLayerUI();applyLayers();showToast('已应用预设');
+}
+
+function setMode(mode,btn){
+  currentMode=mode;
+  document.querySelectorAll('.mode-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  else{const map={cruise:0,alarm:1,command:2,office:3};document.querySelectorAll('.mode-tab')[map[mode]]?.classList.add('active');}
+  document.querySelectorAll('.sc-btn').forEach(b=>b.classList.remove('active'));
+  const sm={cruise:'sb-cruise',alarm:'sb-alarm',command:'sb-command',office:'sb-office'};
+  document.getElementById(sm[mode])?.classList.add('active');
+  const cfg=MODE_CFG[mode]||MODE_CFG.cruise;
+  LAYERS.forEach(l=>{if(!l.locked)layerState[l.id]=cfg.on.includes(l.id)||cfg.auto.includes(l.id);});
+  updateLayerUI();applyLayers();
+  const isAlarm=mode==='alarm'||mode==='command';
+  document.getElementById('alarm-banner').classList.toggle('show',isAlarm);
+  document.getElementById('bc-alarm').textContent=isAlarm?'3':'0';
+  document.getElementById('bc-alarm').style.color=isAlarm?'#E24B4A':'#4CAF50';
+  document.getElementById('smoke-tl').classList.toggle('show',mode==='command');
+  syncFloorViewPos();
+  if(isAlarm){setTimeout(()=>openFloorDetail(0),300);showToast('⚠ 报警模式 · 已定位B1火情楼层');}
+  else showToast(`已切换至「${btn?.textContent||mode}」模式`);
+  if(mode==='command')setView('xray');
+  else if(currentView==='xray'&&mode!=='command')setView('standard');
+}
+function setSmokeTime(t){
+  smokeTime=t;
+  document.querySelectorAll('.stl-btn').forEach((b,i)=>b.classList.toggle('active',[0,1,3,5,10][i]===t));
+  applyLayers();showToast(`烟气推演 T+${t}min`);
+}
+
+// ════════════════════════════════════════════════
+//  楼层详情页（底座完整保留）
+// ════════════════════════════════════════════════
+function buildEagleNav(fid){
+  const sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};
+  const sl={normal:'正常',warn:'警告',alarm:'告警'};
+  document.getElementById('eagle-floor-list').innerHTML=
+    [...FLOORS].reverse().map(f=>`
+    <div class="efl-row${f.id===fid?' active':''}" onclick="switchFloor(${f.id})">
+      <span class="efl-dot" style="background:${sc[f.status]};box-shadow:0 0 4px ${sc[f.status]}66"></span>
+      <span class="efl-lbl">${f.label}</span>
+      <span class="efl-theme">${f.theme.split('/')[0]}</span>
+      <span class="efl-st" style="color:${sc[f.status]}">${sl[f.status]}</span>
+    </div>`).join('');
+}
+function updateFVHeader(fid){
+  const fl=FLOORS[fid];
+  document.getElementById('fv-floor-label').textContent=fl.label+' · '+fl.theme.split('/')[0];
+  document.getElementById('fv-floor-sub').textContent='防火分区 FA-0'+(fid+1)+' · 楼层详情';
+}
+function openFloorDetail(fid){
+  selectedFloor=fid;
+  renderer.render(scene,camera);
+  document.getElementById('bldg-thumb').src=renderer.domElement.toDataURL('image/png');
+  updateFVHeader(fid);buildEagleNav(fid);
+  document.getElementById('floor-view').classList.add('show');
+  syncFloorViewPos();closePanels();
+  setTimeout(()=>drawFloorPlan(fid),100);
+  showToast(`${FLOORS[fid].label} · 楼层详情已打开`);
+}
+function closeFloorDetail(){
+  selectedFloor=-1;
+  document.getElementById('floor-view').classList.remove('show');
+  resetCamera();
+}
+function syncFloorViewPos(){
+  const fv=document.getElementById('floor-view');
+  const bannerShown=document.getElementById('alarm-banner').classList.contains('show');
+  fv.style.top=(bannerShown?82:48)+'px';
+}
+function switchFloor(fid){
+  selectedFloor=fid;updateFVHeader(fid);buildEagleNav(fid);
+  bimSph={theta:0.8,phi:0.58,r:22};bimAutoRot=true;updateCamera2();
+  drawFloorPlan(fid);
+}
+
+// ════════════════════════════════════════════════
+//  BIM 3D 平面图渲染（底座完整保留）
+// ════════════════════════════════════════════════
+let renderer2=null,scene2=null,camera2=null,fp2Objs=[],fp2Lights=[];
+let bimSph={theta:0.8,phi:0.58,r:22};
+let bimAutoRot=true,bimIsDrag=false,bimLastM={x:0,y:0};
+const BIM_TGT=new THREE.Vector3(0,1.2,0);
+
+function updateCamera2(){
+  if(!camera2)return;
+  camera2.position.set(BIM_TGT.x+bimSph.r*Math.sin(bimSph.phi)*Math.sin(bimSph.theta),BIM_TGT.y+bimSph.r*Math.cos(bimSph.phi),BIM_TGT.z+bimSph.r*Math.sin(bimSph.phi)*Math.cos(bimSph.theta));
+  camera2.lookAt(BIM_TGT);
+}
+function initBIMRenderer(){
+  const cvs=document.getElementById('floor-plan-canvas');
+  renderer2=new THREE.WebGLRenderer({canvas:cvs,antialias:true});
+  renderer2.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer2.shadowMap.enabled=true;renderer2.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer2.setClearColor(0x070E1A,1);
+  scene2=new THREE.Scene();scene2.background=new THREE.Color(0x070E1A);
+  camera2=new THREE.PerspectiveCamera(36,1,0.1,200);
+  updateCamera2();
+  fp2Lights=[];
+  const amb2=new THREE.AmbientLight(0x4A6688,1.1);scene2.add(amb2);fp2Lights.push(amb2);
+  const sun2=new THREE.DirectionalLight(0xFFFFFF,1.5);sun2.castShadow=true;sun2.position.set(14,28,18);
+  sun2.shadow.mapSize.set(2048,2048);sun2.shadow.camera.near=1;sun2.shadow.camera.far=80;
+  sun2.shadow.camera.left=-22;sun2.shadow.camera.right=22;sun2.shadow.camera.top=18;sun2.shadow.camera.bottom=-18;sun2.shadow.bias=-0.002;
+  scene2.add(sun2);fp2Lights.push(sun2);
+  const fill2=new THREE.DirectionalLight(0x2233AA,0.4);fill2.position.set(-12,16,-10);scene2.add(fill2);fp2Lights.push(fill2);
+  resizeBIMRenderer();
+}
+function resizeBIMRenderer(){
+  if(!renderer2||!camera2)return;
+  const wrap=document.getElementById('fv-canvas-wrap'),rect=wrap.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  renderer2.setSize(rect.width,rect.height,false);
+  const c=document.getElementById('floor-plan-canvas');c.style.width=rect.width+'px';c.style.height=rect.height+'px';
+  camera2.aspect=rect.width/rect.height;camera2.updateProjectionMatrix();
+}
+function b2box(w,h,d,col,op=1,cast=true,recv=true){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,transparent:op<1,opacity:op,roughness:0.7,metalness:0.1}));
+  m.castShadow=cast;m.receiveShadow=recv;return m;
+}
+function fp2Add(o){scene2.add(o);fp2Objs.push(o);return o;}
+
+const BIM2_ROOM={
+  office:{floor:0x1C3655,wall:0xB0C8DC,flOp:0.55},meeting:{floor:0x133822,wall:0xA0C8B0,flOp:0.55},
+  'meeting-large':{floor:0x0F2E1A,wall:0x90C0A0,flOp:0.6},corridor:{floor:0x0B1A2A,wall:0x90A8BC,flOp:0.4},
+  control:{floor:0x241E0A,wall:0xD0A880,flOp:0.55},danger:{floor:0x370C0C,wall:0xD08080,flOp:0.65},
+  storage:{floor:0x181A26,wall:0xA0A4B8,flOp:0.45},utility:{floor:0x0C2030,wall:0x90B4C8,flOp:0.45},
+  kitchen:{floor:0x20200A,wall:0xC8C890,flOp:0.5},parking:{floor:0x0D1320,wall:0x8898A8,flOp:0.4},
+  lobby:{floor:0x122540,wall:0xA0C0D8,flOp:0.55},
+};
+const WH=2.6,WT=0.2,OT=0.3,FH=0.1,SH=0.12;
+
+function drawFloorPlan(fid){
+  if(!renderer2)initBIMRenderer();
+  fp2Objs.forEach(o=>scene2.remove(o));fp2Objs=[];
+  const fl=FLOORS[fid],rooms=FLOOR_ROOMS[fid]||[];
+  const slab=b2box(BW+OT*2,SH,BD+OT*2,0x090E1A,0.9,false,true);slab.position.y=-SH/2;fp2Add(slab);
+  const owcol=0x9AB0C4,owop=0.55,y=WH/2,t=OT;
+  [[BW+t*2,WH,t,0,y,-BD/2-t/2],[BW+t*2,WH,t,0,y,BD/2+t/2],[t,WH,BD,-BW/2-t/2,y,0],[t,WH,BD,BW/2+t/2,y,0]].forEach(([ww,wh,wd,px,py,pz])=>{const m=b2box(ww,wh,wd,owcol,owop);m.position.set(px,py,pz);fp2Add(m);});
+  rooms.forEach(([xp,yp,wp,hp,label,type])=>{
+    const rx=(xp/100)*BW-BW/2,rz=(yp/100)*BD-BD/2,rw=(wp/100)*BW,rd=(hp/100)*BD,cx=rx+rw/2,cz=rz+rd/2;
+    const cfg=BIM2_ROOM[type]||BIM2_ROOM.office;
+    const flr=b2box(rw-0.04,FH,rd-0.04,cfg.floor,cfg.flOp);flr.position.set(cx,FH/2,cz);fp2Add(flr);
+    const yw=WH/2,wc=cfg.wall,wo=0.45;
+    [[rw,WH,WT,cx,yw,cz-rd/2],[rw,WH,WT,cx,yw,cz+rd/2],[WT,WH,rd,cx-rw/2,yw,cz],[WT,WH,rd,cx+rw/2,yw,cz]].forEach(([ww,wh,wd,px,py,pz])=>{const m=b2box(ww,wh,wd,wc,wo);m.position.set(px,py,pz);fp2Add(m);});
+    addBIM2Furniture(type,cx,cz,rw,rd,fl.status);
+  });
+  if(layerState['L5'])addBIM2Routes(fid);
+  if(layerState['L4'])addBIM2Heat(fid,fl,rooms);
+  if(layerState['L3'])addBIM2Cams();
+  if(layerState['L6']&&smokeTime>0&&fid<=1)addBIM2Smoke();
+  if(layerState['L7'])addBIM2Danger(fid);
+  ['LA','LB','LC','LD','LE','LF','LG'].forEach(lid=>{if(layerState[lid])addBIM2Devices(lid,fid,fl);});
+  if(layerState['LH'])addBIM2Patrol(fid);
+  if(layerState['LI'])addBIM2PatrolRoute(fid);
+  resizeBIMRenderer();
+}
+function addBIM2Furniture(type,cx,cz,rw,rd,status){
+  const DC=0x243A58,CC=0x192E48,TC=0x173045,RC=0x14202E;
+  const fx=p=>cx-rw/2+rw*p, fz=p=>cz-rd/2+rd*p;
+  if(type==='office'){const cols=Math.max(2,Math.floor(rw/2.0)),rows=Math.min(3,Math.floor(rd/1.8));for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){const dx=fx(0.12+c*(0.75/Math.max(cols-1,1))),dz=fz(0.18+r*(0.62/Math.max(rows-1,1)));const desk=b2box(0.95,0.07,0.48,DC,0.8);desk.position.set(dx,0.07,dz);fp2Add(desk);const mon=b2box(0.4,0.16,0.03,0x0C1E38,0.7);mon.position.set(dx,0.18,dz-0.19);fp2Add(mon);const ch=b2box(0.38,0.05,0.38,CC,0.75);ch.position.set(dx,0.05,dz+0.3);fp2Add(ch);}}
+  else if(type==='meeting'||type==='meeting-large'){const tw=rw*.62,td=rd*.48;const tbl=b2box(tw,0.08,td,TC,0.8);tbl.position.set(cx,0.08,cz);fp2Add(tbl);const nS=Math.max(2,Math.floor(tw/.82)),nE=Math.max(1,Math.floor(td/.82));for(let i=0;i<nS;i++){const xo=-tw/2+tw*(i+.5)/nS;[-td/2-.38,td/2+.38].forEach(zo=>{const ch=b2box(.48,.05,.44,CC,.7);ch.position.set(cx+xo,.05,cz+zo);fp2Add(ch);});}for(let i=0;i<nE;i++){const zo=-td/2+td*(i+.5)/nE;[-tw/2-.38,tw/2+.38].forEach(xo=>{const ch=b2box(.44,.05,.48,CC,.7);ch.position.set(cx+xo,.05,cz+zo);fp2Add(ch);});}}
+  else if(type==='control'){const nr=Math.max(2,Math.floor(rw/1.0));for(let i=0;i<nr;i++){const rk=b2box(.55,1.8,.72,RC,.85);rk.position.set(fx(.14+i*(.72/Math.max(nr-1,1))),.9,fz(.25));fp2Add(rk);const lt=b2box(.35,.04,.04,status==='alarm'?0xFF2200:0x00EE44,.9);lt.position.set(rk.position.x,.5,rk.position.z-.37);fp2Add(lt);}}
+  else if(type==='parking'){const nc=Math.max(2,Math.floor(rw*.75));for(let i=0;i<nc;i++){const car=b2box(2.0,.1,.9,0x18243A,.7);car.position.set(fx(.05+(i%Math.ceil(nc/2))*(.88/Math.ceil(nc/2))),.05,fz(i<nc/2?.3:.7));fp2Add(car);}}
+  else if(type==='kitchen'){const c1=b2box(rw*.86,.8,.48,0x222005,.75);c1.position.set(cx,.4,fz(.87));fp2Add(c1);const c2=b2box(.48,.8,rd*.62,0x222005,.75);c2.position.set(fx(.9),.4,cz);fp2Add(c2);}
+  else if(type==='lobby'){const rcp=b2box(rw*.36,.86,rd*.13,0x1A3050,.75);rcp.position.set(cx,.43,fz(.28));fp2Add(rcp);}
+}
+function addBIM2Routes(fid){const routes=ESCAPE_ROUTES[fid]||[];routes.forEach((pts,pi)=>{const col=pi===0?0x4CAF50:0x2196F3;const tpts=pts.map(p=>new THREE.Vector3((p.x/100)*BW-BW/2,0.15,(p.y/100)*BD-BD/2));const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tpts),30,.07,6),new THREE.MeshStandardMaterial({color:col,emissive:new THREE.Color(col),emissiveIntensity:1.2,transparent:true,opacity:.88}));fp2Add(tube);const exit=b2box(.7,.4,.07,pi===0?0x1E7030:0x1E3070,.9);const lp=tpts[tpts.length-1];exit.position.set(lp.x,.4,lp.z);fp2Add(exit);});}
+function addBIM2Heat(fid,fl,rooms){rooms.filter(r=>!['corridor','utility','parking'].includes(r[5])).forEach(([xp,yp,wp,hp])=>{const rx=(xp/100)*BW-BW/2,rz=(yp/100)*BD-BD/2,rw=(wp/100)*BW,rd=(hp/100)*BD;const d=fl.people/200,c=new THREE.Color();c.setHSL(.6-d*.52,.9,.45);const pl=new THREE.Mesh(new THREE.PlaneGeometry(rw-.2,rd-.2),new THREE.MeshStandardMaterial({color:c,transparent:true,opacity:.3,depthWrite:false}));pl.rotation.x=-Math.PI/2;pl.position.set(rx+rw/2,.14,rz+rd/2);fp2Add(pl);});}
+function addBIM2Cams(){const cmat=new THREE.MeshStandardMaterial({color:0x9C88FF,emissive:0x443388,emissiveIntensity:.7});[[BW*.4,BD*.4],[BW*-.4,BD*.4],[0,BD*-.42],[BW*.4,BD*-.3],[BW*-.4,BD*-.3]].forEach(([px,pz])=>{const c=new THREE.Mesh(new THREE.ConeGeometry(.15,.36,6),cmat);c.position.set(px,WH-.2,pz);c.rotation.x=-Math.PI/2;fp2Add(c);const cone=new THREE.Mesh(new THREE.ConeGeometry(1.7,3,16,1,true),new THREE.MeshStandardMaterial({color:0x9C88FF,transparent:true,opacity:.07,side:THREE.DoubleSide,depthWrite:false}));cone.position.set(px,WH*.65,pz+1.1);cone.rotation.x=Math.PI/2;fp2Add(cone);});}
+function addBIM2Smoke(){const op=Math.min(smokeTime/10*.6,.56);const sm=b2box(BW*.8,WH*.45,BD*.8,0x3D2B1F,op,false,false);sm.material.transparent=true;sm.position.set(0,WH*.55,0);fp2Add(sm);}
+function addBIM2Danger(fid){if(fid!==0)return;[[-5,0,-3],[3,0,4]].forEach(([px,,pz])=>{const o=new THREE.Mesh(new THREE.OctahedronGeometry(.38),new THREE.MeshStandardMaterial({color:0xE24B4A,emissive:0xAA2020,emissiveIntensity:.9,transparent:true,opacity:.9}));o.position.set(px,.38,pz);fp2Add(o);});}
+function addBIM2Devices(lid,fid,fl){const cfg=SYSTEM_CFG?.[lid]||{iconType:'LG',bg:'rgba(90,90,160,0.85)',size:0.7};const count=Math.min(Math.floor(fl.devices/6)+1,6),seed=fid*100+lid.charCodeAt(1);for(let i=0;i<count;i++){const isA=(fl.status==='alarm'&&lid==='LB')||(fl.status==='warn'&&i<2&&lid==='LB');const bg=isA?'rgba(200,20,20,0.95)':cfg.bg;const sp=makeIconSprite(cfg.iconType,bg,cfg.size*0.85,{type:'device',lid,floor:fl.label,id:`${fl.label}-${lid}-${i}`,sysName:LAYERS.find(l=>l.id===lid)?.name||lid,status:isA?'alarm':'normal'});sp.position.set((((seed+i*73)%89+5)/100)*BW-BW/2,WH-0.1,(((seed+i*53)%85+5)/100)*BD-BD/2);fp2Add(sp);if(isA){const ring=new THREE.Mesh(new THREE.TorusGeometry(.24,.03,6,16),new THREE.MeshStandardMaterial({color:0xFF0000,emissive:0xFF2222,emissiveIntensity:1.2}));ring.position.copy(sp.position);ring.rotation.x=Math.PI/2;fp2Add(ring);}}}
+function addBIM2Patrol(fid){const fl=FLOORS[fid];const seed=fid*50;for(let i=0;i<3;i++){const sp=makeIconSprite('LH','rgba(40,190,190,0.9)',0.65,{type:'patrol',floor:fl.label,id:`PT-${fl.label}-${i+1}`});sp.position.set(((seed+i*31)%70+15)/100*BW-BW/2,.2+i*.1,(((seed+11)+i*41)%70+15)/100*BD-BD/2);fp2Add(sp);}}
+function addBIM2PatrolRoute(fid){const pts=[new THREE.Vector3(-BW*.38,.14,-BD*.3),new THREE.Vector3(0,.14,-BD*.38),new THREE.Vector3(BW*.38,.14,-BD*.3),new THREE.Vector3(BW*.38,.14,BD*.3),new THREE.Vector3(0,.14,BD*.38),new THREE.Vector3(-BW*.38,.14,BD*.3),new THREE.Vector3(-BW*.38,.14,-BD*.3)];const geo=new THREE.BufferGeometry().setFromPoints(pts);const mat=new THREE.LineDashedMaterial({color:0x40A0FF,dashSize:.4,gapSize:.2,transparent:true,opacity:.8,linewidth:2});const line=new THREE.Line(geo,mat);line.computeLineDistances();fp2Add(line);}
+
+// ════════════════════════════════════════════════
+//  悬停信息卡（底座完整保留）
+// ════════════════════════════════════════════════
+const hcard=document.getElementById('hcard');
+let hoverTm=null, cardLocked=false;
+
+function findHoverTarget(mx,my){
+  const rect=canvas3d.getBoundingClientRect();
+  const cx=mx-rect.left, cy=my-rect.top;
+  let best=null, bestD=32;
+  allSprites.forEach(sp=>{if(!sp.visible)return;const v=sp.position.clone().project(camera);if(v.z>1)return;const sx=(v.x+1)/2*rect.width,sy=(-v.y+1)/2*rect.height;const d=Math.hypot(sx-cx,sy-cy);if(d<bestD){bestD=d;best=sp;}});
+  if(!best){mouse2.x=(cx/rect.width)*2-1;mouse2.y=-(cy/rect.height)*2+1;raycaster.setFromCamera(mouse2,camera);const meshObjs=[...floorMeshes.map(f=>f.wall),...routeMeshes,...smokeMeshes,...dangerMeshes];const hits=raycaster.intersectObjects(meshObjs,false);if(hits.length)best=hits[0].object;}
+  return best;
+}
+
+canvas3d.addEventListener('mousemove',e=>{if(cardLocked)return;clearTimeout(hoverTm);hoverTm=setTimeout(()=>{const h=findHoverTarget(e.clientX,e.clientY);h?.userData?.type?showCard(h,e.clientX,e.clientY):hideCard();},120);});
+canvas3d.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();});
+canvas3d.addEventListener('click',e=>{const h=findHoverTarget(e.clientX,e.clientY);if(h?.userData?.type){cardLocked=true;showCard(h,e.clientX,e.clientY);}else{forceHideCard();}});
+
+const fvCanvas=document.getElementById('floor-plan-canvas');
+let fvHoverTm=null;
+function findFVHoverTarget(mx,my){if(!camera2)return null;const rect=fvCanvas.getBoundingClientRect();if(rect.width<=0||rect.height<=0)return null;const cx=mx-rect.left,cy=my-rect.top;let best=null,bestD=30;fp2Objs.forEach(obj=>{if(!obj.userData?.type||obj.visible===false)return;const v=obj.position.clone().project(camera2);if(v.z>1)return;const sx=(v.x+1)/2*rect.width,sy=(-v.y+1)/2*rect.height;const d=Math.hypot(sx-cx,sy-cy);if(d<bestD){bestD=d;best=obj;}});return best;}
+
+fvCanvas.addEventListener('mousedown',e=>{if(e.button!==0)return;bimIsDrag=true;bimAutoRot=false;bimLastM={x:e.clientX,y:e.clientY};fvCanvas.style.cursor='grabbing';e.preventDefault();});
+window.addEventListener('mouseup',()=>{if(bimIsDrag){bimIsDrag=false;fvCanvas.style.cursor='grab';}});
+window.addEventListener('mousemove',e=>{if(!bimIsDrag)return;const dx=e.clientX-bimLastM.x,dy=e.clientY-bimLastM.y;bimLastM={x:e.clientX,y:e.clientY};bimSph.theta-=dx*.009;bimSph.phi=Math.max(.12,Math.min(1.45,bimSph.phi+dy*.009));updateCamera2();});
+fvCanvas.addEventListener('wheel',e=>{bimSph.r=Math.max(5,Math.min(50,bimSph.r+e.deltaY*.05));bimAutoRot=false;updateCamera2();e.preventDefault();},{passive:false});
+fvCanvas.addEventListener('dblclick',e=>{const h=findFVHoverTarget(e.clientX,e.clientY);if(h?.userData?.type)return;bimSph={theta:0.8,phi:0.58,r:22};bimAutoRot=true;updateCamera2();showToast('视角已复位');});
+fvCanvas.addEventListener('mousemove',e=>{if(bimIsDrag){if(!cardLocked)hideCard();return;}if(cardLocked)return;clearTimeout(fvHoverTm);fvHoverTm=setTimeout(()=>{const h=findFVHoverTarget(e.clientX,e.clientY);h?.userData?.type?showCard(h,e.clientX,e.clientY):hideCard();},150);});
+fvCanvas.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();bimIsDrag=false;});
+fvCanvas.addEventListener('click',e=>{if(bimIsDrag)return;const h=findFVHoverTarget(e.clientX,e.clientY);if(h?.userData?.type){cardLocked=true;showCard(h,e.clientX,e.clientY);}else{forceHideCard();}});
+
+function showCard(obj,mx,my){
+  const ud=obj.userData,type=ud.type;
+  let html='';
+  if(type==='floor')html=cardFloor(ud);
+  else if(type==='device')html=cardDevice(ud);
+  else if(type==='route')html=cardRoute(ud);
+  else if(type==='camera')html=cardCamera(ud);
+  else if(type==='danger')html=cardDanger(ud);
+  else if(type==='patrol')html=cardPatrol(ud);
+  else return;
+  const lockBar='<div class="hc-lock-bar"><span>已锁定 · 点击空白处关闭</span><span class="hc-close-btn" onclick="forceHideCard()">×</span></div>';
+  hcard.innerHTML=(cardLocked?lockBar:'')+html;
+  hcard.classList.toggle('locked',cardLocked);
+  let cx=mx+14,cy=my-20;
+  if(cx+265>window.innerWidth-60)cx=mx-267;
+  if(cy+290>window.innerHeight-50)cy=my-290;
+  hcard.style.left=cx+'px';hcard.style.top=cy+'px';
+  hcard.classList.add('show');
+}
+function hideCard(){if(cardLocked)return;hcard.classList.remove('show','locked');}
+function forceHideCard(){cardLocked=false;hcard.classList.remove('show','locked');}
+hcard.addEventListener('mouseenter',()=>clearTimeout(hoverTm));
+hcard.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();});
+
+function cardFloor(ud){
+  const fl=FLOORS[ud.floorId]||FLOORS[1],sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};const c=sc[fl.status]||'#4CAF50';
+  return `<div class="hch"><div class="hch-dot" style="background:#4A90D9"></div><span class="hch-type">楼层 · 防火分区</span><span class="hch-badge" style="color:${c}">${fl.status==='alarm'?'⚠告警':fl.status==='warn'?'⚠警告':'✓正常'}</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${fl.label}</span></div><div class="hcr"><span class="hcl">当前人员</span><span class="hcv">${fl.people}人</span></div><div class="hcr"><span class="hcl">设备在线</span><span class="hcv" style="color:#4CAF50">${fl.devices}/${fl.devices}</span></div><div class="hcr"><span class="hcl">功能区</span><span class="hcv">${fl.theme.split('/')[0]}</span></div>${fl.alarmText?`<div class="hcdiv"></div><div class="hcr"><span class="hcl">告警</span><span class="hcv" style="color:#E24B4A">${fl.alarmText}</span></div>`:''}</div>
+  <div class="hcpa"><div class="hca" onclick="openFloorDetail(${fl.id});hideCard()">进入楼层详情</div><div class="hca" onclick="showToast('生成报告中')">生成报告</div></div>`;
+}
+function cardDevice(ud){
+  const c=ud.status==='alarm'?'#E24B4A':'#4CAF50';
+  return `<div class="hch"><div class="hch-dot" style="background:${c}"></div><span class="hch-type">${ud.sysName||ud.lid}</span><span class="hch-badge" style="color:${c}">${ud.status==='alarm'?'⚠告警':'✓正常'}</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">设备ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">安装日期</span><span class="hcv">2021-06-15</span></div>${ud.status==='alarm'?'<div class="hcwarn">⚠ 需立即响应</div>':''}</div>
+  <div class="hcpa"><div class="hca r" onclick="showToast('已派单维修')">派单维修</div><div class="hca" onclick="showToast('查看详情')">设备详情</div><div class="hca" onclick="showToast('已标记')">标记处理</div></div>`;
+}
+function cardRoute(ud){return `<div class="hch"><div class="hch-dot" style="background:#4CAF50"></div><span class="hch-type">逃生路径</span><span class="hch-badge" style="color:#4CAF50">推荐路径</span></div><div class="hcb"><div class="hcr"><span class="hcl">路径长度</span><span class="hcv">${ud.len||87}m</span></div><div class="hcr"><span class="hcl">预计用时</span><span class="hcv">约${Math.round((ud.len||87)/1.5)}秒</span></div><div class="hcr"><span class="hcl">全段传感器</span><span class="hcv" style="color:#4CAF50">正常</span></div></div><div class="hcpa"><div class="hca" onclick="showToast('广播引导中')">广播引导</div><div class="hca" onclick="showToast('路径已导出')">导出路径</div></div>`;}
+function cardCamera(ud){return `<div class="hch"><div class="hch-dot" style="background:#9C88FF"></div><span class="hch-type">视频监控</span><span class="hch-badge" style="color:#4CAF50">● 在线</span></div><div class="hcb"><div class="hcr"><span class="hcl">摄像头ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">分辨率</span><span class="hcv">4K / 夜视开</span></div><div class="hcdiv"></div><div style="height:60px;background:rgba(74,144,217,.08);border:1px solid rgba(74,144,217,.2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9.5px;color:rgba(232,244,255,.3)">实时画面缩略图</div></div><div class="hcpa"><div class="hca" onclick="showToast('全屏查看')">全屏查看</div><div class="hca" onclick="showToast('AI分析中…')">AI分析</div><div class="hca" onclick="showToast('历史录像')">历史录像</div></div>`;}
+function cardDanger(ud){return `<div class="hch"><div class="hch-dot" style="background:#FF6B35"></div><span class="hch-type">危险品存放区</span><span class="hch-badge" style="color:#E24B4A">⚠高风险</span></div><div class="hcb"><div class="hcr"><span class="hcl">类型</span><span class="hcv" style="color:#FF6B35">${ud.label}</span></div><div class="hcr"><span class="hcl">存放物</span><span class="hcv">${ud.dtype}</span></div><div class="hcr"><span class="hcl">责任人</span><span class="hcv">王明·138****5678</span></div>${smokeTime>=3&&layerState['L6']?'<div class="hcwarn">⚠ 烟气推演：即将到达！</div>':''}</div><div class="hcpa"><div class="hca r" onclick="showToast('紧急通知已发送！')">紧急通知</div><div class="hca" onclick="showToast('查看台账')">查看台账</div></div>`;}
+function cardPatrol(ud){return `<div class="hch"><div class="hch-dot" style="background:#80FFFF"></div><span class="hch-type">巡检点</span><span class="hch-badge" style="color:#80FFFF">📍</span></div><div class="hcb"><div class="hcr"><span class="hcl">巡检点ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">上次巡检</span><span class="hcv" style="color:#4CAF50">今天 09:22 ✓</span></div><div class="hcr"><span class="hcl">下次计划</span><span class="hcv">明天 09:00</span></div></div><div class="hcpa"><div class="hca" onclick="showToast('开始巡检')">开始巡检</div><div class="hca" onclick="showToast('查看记录')">历史记录</div></div>`;}
+
+// ════════════════════════════════════════════════
+//  浮动面板 & Toast & Clock
+// ════════════════════════════════════════════════
+function togglePanel(name){
+  const isOpen=openPanel===name;closePanels();
+  if(!isOpen){document.getElementById('panel-'+name).classList.add('open');document.getElementById('fb-'+name).classList.add('active');document.getElementById('panel-overlay').classList.add('show');openPanel=name;if(name==='layer')buildLayerList();if(name==='floor')buildFloorList();}
+}
+function closePanels(){
+  document.querySelectorAll('.fpanel').forEach(p=>p.classList.remove('open'));
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-overlay').classList.remove('show');
+  openPanel=null;
+}
+
+// 一期模式特有：抽屉面板切换
+function toggleDrawer(){
+  const drawer=document.getElementById('rightDrawer');
+  drawer.classList.toggle('collapsed');
+}
+
+// 弹窗开关
+function openModal(id){document.getElementById('modal-'+id).classList.add('show');}
+function closeModal(id){document.getElementById('modal-'+id).classList.remove('show');}
+
+let toastTm=null;
+function showToast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTm);toastTm=setTimeout(()=>el.classList.remove('show'),2400);
+}
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false});},1000);
+
+// ════════════════════════════════════════════════
+//  Resize & Render Loop（底座完整保留）
+// ════════════════════════════════════════════════
+function resizeRenderer(){
+  const rect=mainView.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  renderer.setSize(rect.width,rect.height,false);
+  canvas3d.style.width=rect.width+'px';canvas3d.style.height=rect.height+'px';
+  camera.aspect=rect.width/rect.height;camera.updateProjectionMatrix();
+}
+requestAnimationFrame(resizeRenderer);
+window.addEventListener('resize',()=>{resizeRenderer();resizeBIMRenderer();});
+
+let lastT=0,fCnt=0;
+function tick(now=0){
+  requestAnimationFrame(tick);
+  const dt=now-lastT;lastT=now;fCnt++;
+  pulse+=0.05;
+  allSprites.forEach(s=>{if(s.userData?.status==='alarm'){if(s.material?.map)s.material.opacity=0.7+Math.abs(Math.sin(pulse*3))*0.3;if(s.scale)s.scale.setScalar(1+Math.abs(Math.sin(pulse*3))*0.18);}});
+  routeMats.forEach((m,i)=>{if(m.opacity>0)m.emissiveIntensity=0.9+Math.sin(pulse*2-i)*0.5;});
+  dangerMeshes.forEach(d=>{if(dangerMats[dangerMeshes.indexOf(d)]?.opacity>0)d.rotation.y+=0.025;});
+  if(!isDrag&&currentView==='standard'&&selectedFloor<0){sph.theta+=0.0003;updateCamera();}
+  renderer.render(scene,camera);
+  if(renderer2&&scene2&&camera2&&document.getElementById('floor-view').classList.contains('show')){
+    if(bimAutoRot&&!bimIsDrag){bimSph.theta+=0.0006;updateCamera2();}
+    fp2Objs.forEach(o=>{if(o.material?.emissive&&o.userData?.status==='alarm'){o.material.emissiveIntensity=0.8+Math.abs(Math.sin(pulse*3))*0.9;}});
+    renderer2.render(scene2,camera2);
+  }
+}
+
+// ════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════
+applyLayers();
+tick();
+setTimeout(()=>{openFloorDetail(0);showToast('应急指挥模式 · 已定位B1火情楼层');},600);
+
+/* 倒计时：消防队 */
+let etaFire = 442;
+function updateEtaFire() {
+  const m = Math.floor(etaFire / 60), s = etaFire % 60;
+  const el = document.getElementById('eta-countdown');
+  if (el) el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  if (etaFire > 0) etaFire--;
+}
+setInterval(updateEtaFire, 1000);
+updateEtaFire();
+
+/* 倒计时：120急救 */
+let eta120 = 725;
+function updateEta120() {
+  const m = Math.floor(eta120 / 60), s = eta120 % 60;
+  const el = document.getElementById('eta-countdown-120');
+  if (el) el.textContent = `${m}:${s.toString().padStart(2, '0')}`;
+  if (eta120 > 0) eta120--;
+}
+setInterval(updateEta120, 1000);
+updateEta120();
+
+/* 弹窗遮罩关闭 */
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', function(e) {
+    if (e.target === this) this.classList.remove('show');
+  });
+});
+
+/* 绘制报警趋势图 */
+(function() {
+  const canvas = document.getElementById('trendCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+
+  /* 模拟24小时数据（每小时一个点） */
+  const data = [0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,2,1,3,5,8,12,6];
+  const maxVal = Math.max(...data, 1);
+  const padL = 20, padR = 6, padT = 8, padB = 18;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+
+  /* 网格线 */
+  ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = padT + (plotH / 4) * i;
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(W - padR, y); ctx.stroke();
+  }
+
+  /* 面积填充 */
+  ctx.beginPath();
+  ctx.moveTo(padL, padT + plotH);
+  data.forEach((v, i) => {
+    const x = padL + (plotW / (data.length - 1)) * i;
+    const y = padT + plotH - (v / maxVal) * plotH;
+    if (i === 0) ctx.lineTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.lineTo(padL + plotW, padT + plotH);
+  ctx.closePath();
+  const grad = ctx.createLinearGradient(0, padT, 0, padT + plotH);
+  grad.addColorStop(0, 'rgba(226,75,74,0.3)');
+  grad.addColorStop(1, 'rgba(226,75,74,0.02)');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  /* 折线 */
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    const x = padL + (plotW / (data.length - 1)) * i;
+    const y = padT + plotH - (v / maxVal) * plotH;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#E24B4A';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  /* 当前点高亮 */
+  const lastI = data.length - 1;
+  const lastX = padL + plotW;
+  const lastY = padT + plotH - (data[lastI] / maxVal) * plotH;
+  ctx.beginPath(); ctx.arc(lastX, lastY, 3, 0, Math.PI * 2);
+  ctx.fillStyle = '#E24B4A'; ctx.fill();
+  ctx.beginPath(); ctx.arc(lastX, lastY, 6, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(226,75,74,0.3)'; ctx.lineWidth = 1; ctx.stroke();
+
+  /* X轴时间标签 */
+  ctx.fillStyle = 'rgba(232,244,255,0.3)';
+  ctx.font = '8px monospace';
+  ctx.textAlign = 'center';
+  ['00:00','06:00','12:00','18:00','现在'].forEach((lbl, i) => {
+    const x = padL + (plotW / 4) * i;
+    ctx.fillText(lbl, x, H - 4);
+  });
+})();
+</script>
+</body>
+</html>

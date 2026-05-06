@@ -1,0 +1,2854 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>智慧消防驾驶舱 · 巡航模式（一期）</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#060D18;color:#E8F4FF;font-family:'PingFang SC','Microsoft YaHei',sans-serif;overflow:hidden;width:100vw;height:100vh;}
+
+/* ══ TOPBAR ══ */
+#topbar{position:fixed;top:0;left:0;right:0;height:48px;background:rgba(6,13,24,.97);border-bottom:1px solid rgba(74,144,217,.25);display:flex;align-items:center;padding:0 16px;z-index:300;gap:10px;}
+.logo{font-size:14px;font-weight:700;letter-spacing:2px;color:#4A90D9;border-right:1px solid rgba(74,144,217,.3);padding-right:12px;white-space:nowrap;}
+.mode-tabs{display:flex;gap:3px;flex:1;}
+.mode-tab{padding:4px 12px;border-radius:4px;font-size:12px;cursor:pointer;border:1px solid rgba(74,144,217,.2);color:rgba(232,244,255,.5);transition:all .2s;background:transparent;}
+.mode-tab:hover{border-color:rgba(74,144,217,.5);color:#E8F4FF;}
+.mode-tab.active{background:rgba(74,144,217,.18);border-color:#4A90D9;color:#E8F4FF;font-weight:600;}
+.mode-tab.alarm.active{background:rgba(226,75,74,.22);border-color:#E24B4A;color:#FF7070;}
+#clock{font-size:12px;color:rgba(232,244,255,.55);border-left:1px solid rgba(74,144,217,.3);padding-left:12px;white-space:nowrap;}
+
+/* ══ MAIN VIEW ══ */
+#main-view{position:fixed;top:48px;left:0;right:48px;bottom:36px;}
+#three-canvas{width:100%;height:100%;display:block;}
+#help-tip{position:absolute;bottom:8px;left:12px;font-size:9px;color:rgba(232,244,255,.22);line-height:1.9;pointer-events:none;}
+
+/* ══ ALARM BANNER ══ */
+#alarm-banner{position:fixed;top:48px;left:0;right:48px;height:34px;background:linear-gradient(90deg,rgba(226,75,74,.28),rgba(226,75,74,.10));border-bottom:1px solid rgba(226,75,74,.5);display:none;align-items:center;padding:0 16px;gap:12px;z-index:200;}
+#alarm-banner.show{display:flex;}
+.ab-pulse{width:7px;height:7px;border-radius:50%;background:#E24B4A;animation:pulseA 1.3s infinite;}
+@keyframes pulseA{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(226,75,74,.6)}50%{opacity:.5;box-shadow:0 0 0 6px rgba(226,75,74,0)}}
+.ab-title{font-size:13px;font-weight:700;color:#E24B4A;}
+.ab-info{font-size:11px;color:rgba(232,244,255,.65);flex:1;}
+.ab-btn{padding:3px 10px;border-radius:3px;font-size:11px;cursor:pointer;background:rgba(226,75,74,.18);border:1px solid rgba(226,75,74,.45);color:#E24B4A;transition:all .2s;}
+.ab-btn:hover{background:rgba(226,75,74,.35);}
+.ab-btn.g{background:rgba(76,175,80,.12);border-color:rgba(76,175,80,.4);color:#4CAF50;}
+
+/* ══ FLOAT COL ══ */
+#float-col{position:fixed;top:48px;right:0;bottom:36px;width:48px;display:flex;flex-direction:column;align-items:center;padding:14px 0;gap:6px;z-index:250;background:rgba(8,16,28,.93);border-left:1px solid rgba(74,144,217,.2);}
+.fb{width:36px;height:36px;border-radius:7px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:1px;border:1px solid rgba(74,144,217,.2);background:rgba(74,144,217,.06);color:rgba(232,244,255,.55);transition:all .2s;font-size:15px;}
+.fb:hover,.fb.active{background:rgba(74,144,217,.2);border-color:#4A90D9;color:#E8F4FF;}
+.fb-lbl{font-size:7.5px;line-height:1;}
+.fb-div{width:22px;height:1px;background:rgba(74,144,217,.2);margin:3px 0;}
+
+/* ══ FLOAT PANELS ══ */
+.fpanel{position:fixed;right:48px;width:230px;z-index:248;background:rgba(8,20,38,.97);border:1px solid rgba(74,144,217,.3);border-radius:8px 0 0 8px;backdrop-filter:blur(14px);box-shadow:-6px 0 28px rgba(0,0,0,.45);transform:translateX(8px);opacity:0;pointer-events:none;transition:transform .22s,opacity .22s;max-height:calc(100vh - 100px);overflow-y:auto;}
+.fpanel::-webkit-scrollbar{width:3px;}.fpanel::-webkit-scrollbar-thumb{background:rgba(74,144,217,.3);border-radius:2px;}
+.fpanel.open{transform:translateX(0);opacity:1;pointer-events:all;}
+.fp-ttl{font-size:10px;font-weight:600;color:rgba(74,144,217,.8);letter-spacing:1.5px;padding:11px 13px 7px;border-bottom:1px solid rgba(74,144,217,.12);}
+#panel-scene{top:62px;}
+.sc-btn{display:flex;align-items:center;gap:9px;padding:8px 13px;cursor:pointer;transition:background .15s;border-bottom:1px solid rgba(255,255,255,.04);}
+.sc-btn:hover{background:rgba(74,144,217,.1);}
+.sc-btn.active{background:rgba(74,144,217,.18);border-right:2px solid #4A90D9;}
+.sc-btn.alarm-s.active .sc-nm{color:#E24B4A;}
+.sc-ico{font-size:14px;width:20px;text-align:center;}
+.sc-nm{font-size:12px;color:#E8F4FF;flex:1;}
+.sc-ds{font-size:9px;color:rgba(232,244,255,.38);}
+#panel-layer{top:108px;}
+.lp-preset{padding:7px 10px;border-bottom:1px solid rgba(74,144,217,.1);}
+.lp-pgrid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:5px;}
+.lp-pb{padding:4px;border-radius:3px;font-size:9.5px;cursor:pointer;text-align:center;background:rgba(74,144,217,.07);border:1px solid rgba(74,144,217,.2);color:rgba(232,244,255,.6);transition:all .2s;}
+.lp-pb:hover{background:rgba(74,144,217,.2);color:#E8F4FF;}
+.lr{display:flex;align-items:center;gap:8px;padding:6px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .14s;}
+.lr:hover{background:rgba(74,144,217,.08);}
+.lr-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.lr-nm{font-size:11px;color:rgba(232,244,255,.75);flex:1;}
+.lr-tag{font-size:8.5px;padding:1px 5px;border-radius:10px;background:rgba(74,144,217,.14);color:#4A90D9;white-space:nowrap;}
+.lr-tag.a{background:rgba(76,175,80,.14);color:#4CAF50;}
+.tsw{width:28px;height:14px;border-radius:7px;background:rgba(255,255,255,.1);cursor:pointer;transition:background .2s;position:relative;flex-shrink:0;}
+.tsw.on{background:#4A90D9;}
+.tsw::after{content:'';position:absolute;width:10px;height:10px;background:#fff;border-radius:50%;top:2px;left:2px;transition:left .2s;}
+.tsw.on::after{left:16px;}
+#panel-view{top:154px;}
+.vo{display:flex;align-items:center;gap:10px;padding:10px 13px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);transition:background .15s;}
+.vo:hover{background:rgba(74,144,217,.1);}
+.vo.active{background:rgba(74,144,217,.2);}
+.vo-ico{font-size:18px;width:22px;text-align:center;}
+.vo-nm{font-size:12px;color:#E8F4FF;}
+.vo-ds{font-size:9px;color:rgba(232,244,255,.38);margin-top:1px;}
+#panel-floor{top:200px;}
+.fl-row{display:flex;align-items:center;gap:8px;padding:8px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .14s;}
+.fl-row:hover{background:rgba(74,144,217,.1);}
+.fl-row.active{background:rgba(74,144,217,.2);border-right:2px solid #4A90D9;}
+#panel-overlay{position:fixed;inset:0;z-index:240;display:none;}
+#panel-overlay.show{display:block;}
+
+/* ══ BOTTOM BAR ══ */
+#bottombar{position:fixed;bottom:0;left:0;right:48px;height:36px;background:rgba(6,13,24,.96);border-top:1px solid rgba(74,144,217,.2);display:flex;align-items:center;padding:0 14px;gap:20px;z-index:300;font-size:10.5px;color:rgba(232,244,255,.5);}
+.sv{color:#E8F4FF;font-weight:600;}
+.sok{color:#4CAF50;}.swrn{color:#FFC107;}.serr{color:#E24B4A;}
+
+/* ══ SMOKE TIMELINE ══ */
+#smoke-tl{position:fixed;bottom:44px;left:50%;transform:translateX(-50%);background:rgba(8,20,38,.95);border:1px solid rgba(255,107,53,.4);border-radius:8px;padding:7px 13px;z-index:260;display:none;align-items:center;gap:9px;backdrop-filter:blur(10px);}
+#smoke-tl.show{display:flex;}
+.stl-lbl{font-size:11px;color:rgba(255,107,53,.85);white-space:nowrap;}
+.stl-btn{padding:3px 9px;border-radius:3px;font-size:10.5px;cursor:pointer;background:rgba(255,107,53,.1);border:1px solid rgba(255,107,53,.3);color:rgba(232,244,255,.7);transition:all .2s;}
+.stl-btn.active,.stl-btn:hover{background:rgba(255,107,53,.28);border-color:#FF6B35;color:#E8F4FF;}
+
+/* ══ HOVER CARD ══ */
+#hcard{position:fixed;z-index:350;width:254px;background:rgba(8,20,38,.97);border:1px solid rgba(74,144,217,.4);border-radius:8px;pointer-events:none;box-shadow:0 8px 32px rgba(0,0,0,.6);backdrop-filter:blur(12px);opacity:0;transform:translateY(5px);transition:opacity .14s,transform .14s;}
+#hcard.show{opacity:1;transform:translateY(0);pointer-events:all;}
+#hcard.locked{border-color:rgba(74,144,217,.7);}
+.hc-lock-bar{display:none;align-items:center;justify-content:space-between;padding:4px 10px 0;font-size:9px;color:rgba(74,144,217,.6);}
+#hcard.locked .hc-lock-bar{display:flex;}
+.hc-close-btn{cursor:pointer;font-size:13px;color:rgba(232,244,255,.35);padding:1px 4px;border-radius:3px;transition:all .15s;}
+.hc-close-btn:hover{background:rgba(255,255,255,.1);color:#E8F4FF;}
+
+/* 场景描述用户标签 */
+.sc-user{font-size:8.5px;color:rgba(74,144,217,.65);margin-top:2px;letter-spacing:.2px;}
+
+/* 视图面板 — 禁用/即将推出 */
+.vo.disabled{opacity:.42;cursor:default;}
+.vo.disabled:hover{background:transparent;}
+.soon-tag{font-size:8px;padding:2px 5px;border-radius:3px;background:rgba(74,144,217,.1);color:rgba(74,144,217,.6);border:1px solid rgba(74,144,217,.18);white-space:nowrap;}
+.hch{display:flex;align-items:center;gap:8px;padding:9px 12px 7px;border-bottom:1px solid rgba(74,144,217,.12);}
+.hch-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
+.hch-type{font-size:10px;color:rgba(232,244,255,.5);flex:1;}
+.hch-badge{font-size:10px;font-weight:600;}
+.hcb{padding:9px 12px;}
+.hcr{display:flex;justify-content:space-between;padding:2.5px 0;font-size:11px;}
+.hcl{color:rgba(232,244,255,.46);}
+.hcv{color:#E8F4FF;font-weight:500;}
+.hcdiv{height:1px;background:rgba(74,144,217,.1);margin:6px 0;}
+.hcprop{padding:0 12px 7px;}
+.hcp{padding:3px 0;font-size:11px;line-height:1.5;}
+.hcpl{color:rgba(74,144,217,.8);font-weight:600;font-size:10px;}
+.hcpa{display:flex;gap:5px;padding:7px 12px;border-top:1px solid rgba(74,144,217,.1);}
+.hca{flex:1;padding:5px 3px;border-radius:4px;font-size:9.5px;text-align:center;background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.25);color:#4A90D9;cursor:pointer;transition:all .15s;pointer-events:all;}
+.hca:hover{background:rgba(74,144,217,.25);}
+.hca.r{background:rgba(226,75,74,.1);border-color:rgba(226,75,74,.3);color:#E24B4A;}
+.hcwarn{color:#E24B4A;font-size:11px;font-weight:600;padding:3px 12px 7px;animation:pulseA .9s infinite;}
+
+/* ══ FLOOR DETAIL VIEW ══ */
+/* 与主视图占同一区域，topbar/float-col/bottombar 自然可见 */
+#floor-view{position:fixed;top:48px;left:0;right:48px;bottom:36px;background:#070E1A;z-index:100;display:none;flex-direction:column;}
+#floor-view.show{display:flex;}
+
+/* 楼层面包屑导航条（32px，简洁） */
+#fv-header{height:32px;background:rgba(6,13,24,.95);border-bottom:1px solid rgba(74,144,217,.18);display:flex;align-items:center;padding:0 12px;gap:10px;flex-shrink:0;}
+#fv-floor-label{font-size:12px;font-weight:700;color:#E8F4FF;}
+#fv-floor-sub{font-size:10px;color:rgba(232,244,255,.38);}
+.fv-back-btn{margin-left:auto;padding:3px 10px;border-radius:3px;font-size:10px;cursor:pointer;border:1px solid rgba(74,144,217,.22);color:rgba(232,244,255,.5);background:transparent;transition:all .2s;white-space:nowrap;}
+.fv-back-btn:hover{background:rgba(74,144,217,.15);border-color:#4A90D9;color:#E8F4FF;}
+
+/* 鹰眼 + 楼层导航（左下角复合面板） */
+#eagle-eye{position:absolute;left:14px;bottom:14px;z-index:20;width:176px;border:1px solid rgba(74,144,217,.45);border-radius:8px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.6);background:rgba(6,13,24,.96);backdrop-filter:blur(10px);}
+#eagle-hdr{display:flex;align-items:center;padding:5px 9px;gap:7px;border-bottom:1px solid rgba(74,144,217,.15);background:rgba(74,144,217,.06);cursor:pointer;transition:background .15s;}
+#eagle-hdr:hover{background:rgba(74,144,217,.18);}
+#eagle-hdr-lbl{font-size:10px;font-weight:600;color:rgba(74,144,217,.9);letter-spacing:.5px;flex:1;}
+.eagle-back{font-size:9.5px;color:rgba(232,244,255,.4);white-space:nowrap;}
+#bldg-thumb{width:176px;height:112px;object-fit:cover;display:block;opacity:.84;border-bottom:1px solid rgba(74,144,217,.1);}
+/* 楼层列表 */
+#eagle-floor-list{padding:4px 0;}
+.efl-row{display:flex;align-items:center;gap:6px;padding:5px 9px;cursor:pointer;transition:background .14s;border-left:2px solid transparent;}
+.efl-row:hover{background:rgba(74,144,217,.1);}
+.efl-row.active{background:rgba(74,144,217,.18);border-left-color:#4A90D9;}
+.efl-row.active .efl-lbl{color:#E8F4FF;font-weight:700;}
+.efl-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.efl-lbl{font-size:11px;color:rgba(232,244,255,.65);width:24px;}
+.efl-theme{font-size:9.5px;color:rgba(232,244,255,.35);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.efl-st{font-size:9px;white-space:nowrap;}
+
+/* BIM 画布提示 */
+#fv-tip{position:absolute;bottom:14px;right:14px;font-size:9px;color:rgba(232,244,255,.2);line-height:1.8;pointer-events:none;text-align:right;}
+
+/* Floor view body */
+#fv-body{flex:1;display:flex;min-height:0;}
+#fv-canvas-wrap{flex:1;position:relative;min-width:0;}
+#floor-plan-canvas{width:100%;height:100%;display:block;cursor:grab;}
+#floor-plan-canvas:active{cursor:grabbing;}
+
+/* ══ TOAST ══ */
+#toast{position:fixed;bottom:50px;left:50%;transform:translateX(-50%);background:rgba(74,144,217,.92);color:#fff;padding:6px 18px;border-radius:20px;font-size:12px;z-index:500;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;}
+#toast.show{opacity:1;}
+
+/* ══ X-RAY BADGE ══ */
+#xray-badge{position:fixed;top:58px;left:50%;transform:translateX(-50%);background:rgba(26,75,107,.92);border:1px solid #1A5B7A;border-radius:4px;padding:3px 12px;font-size:10.5px;color:#4ABFDC;z-index:260;display:none;}
+#xray-badge.show{display:block;}
+</style>
+</head>
+<body>
+
+<!-- ══ TOPBAR ══ -->
+<div id="topbar">
+  <div class="logo">智慧消防驾驶舱</div>
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="setMode('cruise',this)">◎ 巡航模式</button>
+    <button class="mode-tab alarm" onclick="location.href='alarm.html'">⚠ 报警响应</button>
+    <button class="mode-tab" onclick="location.href='emergency.html'">◈ 应急指挥</button>
+    <button class="mode-tab" onclick="location.href='office.html'">◧ 安全办公</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:12px">
+    <span style="font-size:11px;color:rgba(232,244,255,.5)">2026-05-05 16:00:00</span>
+    <span style="font-size:11px;color:#4CAF50">● 系统正常</span>
+  </div>
+</div>
+
+<!-- ══ ALARM BANNER ══ -->
+<div id="alarm-banner">
+  <span class="ab-pulse"></span>
+  <span class="ab-title">🔴 火情告警</span>
+  <span class="ab-info">B1层 · 手动报警按钮 MCP-B1-003 触发 · 14:32:18 · 正在联动排烟/喷淋</span>
+  <button class="ab-btn" onclick="showToast('已确认告警')">确认告警</button>
+  <button class="ab-btn g" onclick="showToast('已接管指挥权')">接管指挥</button>
+</div>
+
+<!-- ══ MAIN VIEW ══ -->
+<div id="main-view">
+  <canvas id="three-canvas"></canvas>
+  <div id="xray-badge">X-RAY 透视模式</div>
+  <div id="help-tip">左键旋转 · 滚轮缩放 · 右键平移<br>双击楼层 → 进入楼层详情</div>
+</div>
+
+<!-- ══ FLOAT COL ══ -->
+<div id="float-col">
+  <button class="fb" id="fb-scene" onclick="togglePanel('scene')" title="场景模式"><span>🏢</span><span class="fb-lbl">场景</span></button>
+  <button class="fb" id="fb-layer" onclick="togglePanel('layer')" title="图层"><span>🗂</span><span class="fb-lbl">图层</span></button>
+  <button class="fb" id="fb-view"  onclick="togglePanel('view')"  title="视图"><span>🔳</span><span class="fb-lbl">视图</span></button>
+  <div class="fb-div"></div>
+  <button class="fb" id="fb-floor" onclick="togglePanel('floor')" title="楼层"><span>📐</span><span class="fb-lbl">楼层</span></button>
+  <div class="fb-div" style="margin-top:auto"></div>
+  <button class="fb" onclick="resetCamera();showToast('视角已复原')" title="复原"><span>⟳</span><span class="fb-lbl">复原</span></button>
+</div>
+
+<!-- Scene Panel -->
+<div class="fpanel" id="panel-scene">
+  <div class="fp-ttl">场景模式</div>
+  <div class="sc-btn active" id="sb-cruise" onclick="setMode('cruise',null);closePanels()">
+    <span class="sc-ico">◎</span>
+    <div><div class="sc-nm">巡航模式</div><div class="sc-ds">全楼层设备状态巡视，标注异常点位</div><div class="sc-user">↳ 消控室值班员</div></div>
+  </div>
+  <div class="sc-btn alarm-s" id="sb-alarm" onclick="setMode('alarm',null);closePanels()">
+    <span class="sc-ico">⚠</span>
+    <div><div class="sc-nm">报警响应</div><div class="sc-ds">事件联动·逃生路径·人员热力定位</div><div class="sc-user">↳ 消控室 · 安全管理员</div></div>
+  </div>
+  <div class="sc-btn" id="sb-command" onclick="setMode('command',null);closePanels()">
+    <span class="sc-ico">◈</span>
+    <div><div class="sc-nm">应急指挥</div><div class="sc-ds">X-Ray透视·危险品分布·全图层联动</div><div class="sc-user">↳ 应急指挥中心 · 消防队</div></div>
+  </div>
+  <div class="sc-btn" id="sb-public" onclick="setMode('public',null);closePanels()">
+    <span class="sc-ico">◑</span>
+    <div><div class="sc-nm">公共展示</div><div class="sc-ds">建筑总览·人员分布·简洁展示界面</div><div class="sc-user">↳ 大堂公共屏 · 访客接待</div></div>
+  </div>
+  <div class="sc-btn" id="sb-office" onclick="setMode('office',null);closePanels()">
+    <span class="sc-ico">◧</span>
+    <div><div class="sc-nm">安全办公</div><div class="sc-ds">巡检计划·合规审查·台账与报表</div><div class="sc-user">↳ 安全办公室 · 楼管</div></div>
+  </div>
+</div>
+
+<!-- Layer Panel -->
+<div class="fpanel" id="panel-layer">
+  <div class="fp-ttl">图层控制</div>
+  <div class="lp-preset">
+    <div style="font-size:9.5px;color:rgba(232,244,255,.38);margin-bottom:4px">快速预设</div>
+    <div class="lp-pgrid">
+      <div class="lp-pb" onclick="applyPreset('daily')">日常巡检</div>
+      <div class="lp-pb" onclick="applyPreset('war')">战时指挥</div>
+      <div class="lp-pb" onclick="applyPreset('drill')">推演分析</div>
+      <div class="lp-pb" onclick="applyPreset('patrol')">巡检模式</div>
+    </div>
+  </div>
+  <div id="layer-list-inner"></div>
+</div>
+
+<!-- View Panel -->
+<div class="fpanel" id="panel-view">
+  <div class="fp-ttl">3D 视图</div>
+  <div class="vo active" id="vo-std" onclick="setView('standard');closePanels()">
+    <span class="vo-ico">⬜</span><div><div class="vo-nm">标准 3D</div><div class="vo-ds">半透明外立面 · 全楼层</div></div>
+  </div>
+  <div class="vo" id="vo-xray" onclick="setView('xray');closePanels()">
+    <span class="vo-ico">⬡</span><div><div class="vo-nm">X-Ray 透视</div><div class="vo-ds">线框结构 · 管网可见</div></div>
+  </div>
+  <div style="height:1px;background:rgba(74,144,217,.1);margin:4px 10px"></div>
+  <div class="fp-ttl" style="padding-top:8px">终端适配</div>
+  <div class="vo disabled" onclick="showToast('平板模式开发中，敬请期待')">
+    <span class="vo-ico">▭</span><div><div class="vo-nm">平板模式</div><div class="vo-ds">触控优化 · 竖屏适配</div></div><span class="soon-tag">规划中</span>
+  </div>
+  <div class="vo disabled" onclick="showToast('视频墙模式开发中，敬请期待')">
+    <span class="vo-ico">⊞</span><div><div class="vo-nm">视频墙</div><div class="vo-ds">多屏拼接 · 指挥大屏</div></div><span class="soon-tag">规划中</span>
+  </div>
+</div>
+
+<!-- Floor Panel -->
+<div class="fpanel" id="panel-floor">
+  <div class="fp-ttl">楼层概览</div>
+  <div id="floor-list-inner"></div>
+</div>
+
+<div id="panel-overlay" onclick="closePanels()"></div>
+
+<!-- ══ BOTTOM BAR ══ -->
+<div id="bottombar">
+  <div class="stat-item" style="display:flex;gap:6px;align-items:center"><span>在线设备</span><span class="sv sok">247/250</span></div>
+  <div style="display:flex;gap:6px;align-items:center"><span>当前人员</span><span class="sv">267</span></div>
+  <div style="display:flex;gap:6px;align-items:center"><span>告警</span><span class="sv" id="bc-alarm" style="color:#4CAF50">0</span></div>
+  <div style="display:flex;gap:6px;align-items:center"><span>水压</span><span class="sv sok">0.82 MPa</span></div>
+  <div style="flex:1"></div>
+  <span id="view-lbl" style="color:rgba(232,244,255,.4)">标准3D · LOD-1</span>
+  <span style="color:rgba(232,244,255,.25)">BIM v2.3</span>
+</div>
+
+<!-- Smoke Timeline -->
+<div id="smoke-tl">
+  <span class="stl-lbl">🔴 烟气推演 T+</span>
+  <div style="display:flex;gap:4px">
+    <button class="stl-btn active" onclick="setSmokeTime(0)">0</button>
+    <button class="stl-btn" onclick="setSmokeTime(1)">+1min</button>
+    <button class="stl-btn" onclick="setSmokeTime(3)">+3min</button>
+    <button class="stl-btn" onclick="setSmokeTime(5)">+5min</button>
+    <button class="stl-btn" onclick="setSmokeTime(10)">+10min</button>
+  </div>
+  <span class="stl-lbl" style="font-size:8.5px;color:rgba(255,107,53,.5)">AI推演·非实测</span>
+</div>
+
+<!-- ══ FLOOR DETAIL VIEW ══ -->
+<div id="floor-view">
+  <!-- 面包屑导航条 -->
+  <div id="fv-header">
+    <span id="fv-floor-label">3F</span>
+    <span style="color:rgba(74,144,217,.3)">·</span>
+    <span id="fv-floor-sub">楼层详情</span>
+    <button class="fv-back-btn" onclick="closeFloorDetail()">← 返回总览</button>
+  </div>
+  <!-- BIM 画布区域（全宽，与主视图同区域，右侧共用 float-col） -->
+  <div id="fv-body">
+    <div id="fv-canvas-wrap">
+      <canvas id="floor-plan-canvas"></canvas>
+      <!-- 鹰眼 + 楼层导航（左下角） -->
+      <div id="eagle-eye">
+        <div id="eagle-hdr" onclick="closeFloorDetail()">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(74,144,217,.85)" stroke-width="2.2" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+          <span id="eagle-hdr-lbl">总体鹰眼</span>
+          <span class="eagle-back">返回总览</span>
+        </div>
+        <img id="bldg-thumb" src="" alt="">
+        <div id="eagle-floor-list"></div>
+      </div>
+      <!-- 操作提示 -->
+      <div id="fv-tip">拖拽旋转 · 滚轮缩放 · 双击复位<br>移入图标查看信息</div>
+    </div>
+  </div>
+</div>
+
+<!-- Hover Card -->
+<div id="hcard"></div>
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ══ 弹窗1：事件列表（事件处置率点击） ══ -->
+<div class="modal-overlay" id="modal-event-list" onclick="if(event.target===this)closeModal('modal-event-list')">
+  <div class="modal-box" style="width:720px">
+    <div class="modal-header">
+      <h3>事件列表</h3>
+      <button class="modal-close" onclick="closeModal('modal-event-list')">✕</button>
+    </div>
+    <div class="modal-content">
+      <!-- 筛选栏 -->
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>告警级别</label>
+          <select class="filter-select"><option>全部</option><option>火警</option><option>预警</option><option>故障</option><option>信息</option></select>
+        </div>
+        <div class="filter-group">
+          <label>处置状态</label>
+          <select class="filter-select"><option>全部</option><option>已处置</option><option>处置中</option><option>待处置</option></select>
+        </div>
+        <div class="filter-group">
+          <label>时间范围</label>
+          <select class="filter-select"><option>今日</option><option>近3日</option><option>近7日</option></select>
+        </div>
+        <div class="filter-group">
+          <label>关键词</label>
+          <input class="filter-input" placeholder="设备名称/位置">
+        </div>
+      </div>
+      <!-- 列表 -->
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>告警级别</th><th>设备名称</th><th>告警区域</th><th>告警内容</th><th>告警时间</th><th>处置状态</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="tag-fire">火警</span></td>
+              <td>手动报警按钮 MCP-B1-003</td>
+              <td>B1层·设备机房</td>
+              <td>手动报警按钮触发</td>
+              <td>15:42:01</td>
+              <td><span class="tag-done">已处置</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看详情')">详情</button><button class="btn-sm btn-sm-warn" onclick="openModal('modal-dispatch');closeModal('modal-event-list')">转工单</button></td>
+            </tr>
+            <tr>
+              <td><span class="tag-warn">预警</span></td>
+              <td>感温探测器 T-034</td>
+              <td>4F层·茶水间</td>
+              <td>温度超阈值 41°C/阈值40°C</td>
+              <td>14:18:41</td>
+              <td><span class="tag-done">已处置</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看详情')">详情</button><button class="btn-sm btn-sm-warn" onclick="openModal('modal-dispatch');closeModal('modal-event-list')">转工单</button></td>
+            </tr>
+            <tr>
+              <td><span class="tag-fault">故障</span></td>
+              <td>感烟探测器 SM-047</td>
+              <td>3F层·东北区</td>
+              <td>设备离线超过24小时</td>
+              <td>13:55:22</td>
+              <td><span class="tag-pending">待处置</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看详情')">详情</button><button class="btn-sm btn-sm-warn" onclick="openModal('modal-dispatch');closeModal('modal-event-list')">转工单</button><button class="btn-sm btn-sm-danger" onclick="showToast('告警已消除')">消除</button></td>
+            </tr>
+            <tr>
+              <td><span class="tag-info">信息</span></td>
+              <td>摄像头 CAM-023</td>
+              <td>2F层·通道</td>
+              <td>AI识别通道阻塞</td>
+              <td>13:20:08</td>
+              <td><span class="tag-done">已处置</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看详情')">详情</button><button class="btn-sm btn-sm-warn" onclick="openModal('modal-dispatch');closeModal('modal-event-list')">转工单</button></td>
+            </tr>
+            <tr>
+              <td><span class="tag-warn">预警</span></td>
+              <td>水压传感器 WP-B1-012</td>
+              <td>B1层·消防泵房</td>
+              <td>水压低于0.15MPa</td>
+              <td>12:05:33</td>
+              <td><span class="tag-done">已处置</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看详情')">详情</button><button class="btn-sm btn-sm-warn" onclick="openModal('modal-dispatch');closeModal('modal-event-list')">转工单</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-size:11px;color:rgba(255,255,255,.35)">共 53 条 · 已处置 51 · 待处置 2</span>
+      <button class="btn-secondary" onclick="closeModal('modal-event-list')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗2：巡检列表（巡检完成率点击） ══ -->
+<div class="modal-overlay" id="modal-inspect-list" onclick="if(event.target===this)closeModal('modal-inspect-list')">
+  <div class="modal-box" style="width:720px">
+    <div class="modal-header">
+      <h3>巡检计划列表</h3>
+      <button class="modal-close" onclick="closeModal('modal-inspect-list')">✕</button>
+    </div>
+    <div class="modal-content">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>巡检状态</label>
+          <select class="filter-select"><option>全部</option><option>已完成</option><option>进行中</option><option>待巡检</option><option>已延期</option></select>
+        </div>
+        <div class="filter-group">
+          <label>计划类型</label>
+          <select class="filter-select"><option>全部</option><option>日常巡检</option><option>专项巡检</option><option>临时任务</option></select>
+        </div>
+        <div class="filter-group">
+          <label>责任人</label>
+          <select class="filter-select"><option>全部</option><option>王磊</option><option>张明远</option><option>李建国</option><option>赵敏</option></select>
+        </div>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>计划名称</th><th>巡检区域</th><th>频次</th><th>责任人</th><th>任务进度</th><th>状态</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>B1层日常巡检-0505</td>
+              <td>B1层</td>
+              <td>每日</td>
+              <td>王磊</td>
+              <td><div class="progress-bar"><div class="progress-fill" style="width:80%;background:#4CAF50"></div></div><span class="progress-text">8/10</span></td>
+              <td><span class="tag-progress">进行中</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="closeModal('modal-inspect-list');openModal('modal-inspect-detail')">详情</button></td>
+            </tr>
+            <tr>
+              <td>3F层日常巡检-0505</td>
+              <td>3F层</td>
+              <td>每日</td>
+              <td>张明远</td>
+              <td><div class="progress-bar"><div class="progress-fill" style="width:100%;background:#4CAF50"></div></div><span class="progress-text">10/10</span></td>
+              <td><span class="tag-done">已完成</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="closeModal('modal-inspect-list');openModal('modal-inspect-detail')">详情</button></td>
+            </tr>
+            <tr>
+              <td>4F层日常巡检-0505</td>
+              <td>4F层</td>
+              <td>每日</td>
+              <td>李建国</td>
+              <td><div class="progress-bar"><div class="progress-fill" style="width:100%;background:#4CAF50"></div></div><span class="progress-text">10/10</span></td>
+              <td><span class="tag-done">已完成</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="closeModal('modal-inspect-list');openModal('modal-inspect-detail')">详情</button></td>
+            </tr>
+            <tr>
+              <td>2F层日常巡检-0505</td>
+              <td>2F层</td>
+              <td>每日</td>
+              <td>赵敏</td>
+              <td><div class="progress-bar"><div class="progress-fill" style="width:0%;background:#FF9800"></div></div><span class="progress-text">0/8</span></td>
+              <td><span class="tag-pending">待巡检</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="closeModal('modal-inspect-list');openModal('modal-inspect-detail')">详情</button></td>
+            </tr>
+            <tr>
+              <td>5F层消防设施专项巡检</td>
+              <td>5F层</td>
+              <td>每周</td>
+              <td>王磊</td>
+              <td><div class="progress-bar"><div class="progress-fill" style="width:30%;background:#FF3B30"></div></div><span class="progress-text">3/10</span></td>
+              <td><span class="tag-overdue">已延期</span></td>
+              <td class="td-actions"><button class="btn-sm" onclick="closeModal('modal-inspect-list');openModal('modal-inspect-detail')">详情</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-size:11px;color:rgba(255,255,255,.35)">共 15 条 · 已完成 13 · 进行中 1 · 待巡检 1</span>
+      <button class="btn-secondary" onclick="closeModal('modal-inspect-list')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗3：监测设备列表（在线率点击） ══ -->
+<div class="modal-overlay" id="modal-device-list" onclick="if(event.target===this)closeModal('modal-device-list')">
+  <div class="modal-box" style="width:720px">
+    <div class="modal-header">
+      <h3>监测设备列表</h3>
+      <button class="modal-close" onclick="closeModal('modal-device-list')">✕</button>
+    </div>
+    <div class="modal-content">
+      <div class="filter-bar">
+        <div class="filter-group">
+          <label>设备状态</label>
+          <select class="filter-select"><option>全部</option><option>在线</option><option>离线</option><option>异常</option></select>
+        </div>
+        <div class="filter-group">
+          <label>设备类型</label>
+          <select class="filter-select"><option>全部</option><option>感烟探测器</option><option>感温探测器</option><option>手动报警</option><option>水压传感器</option><option>摄像头</option></select>
+        </div>
+        <div class="filter-group">
+          <label>所在楼层</label>
+          <select class="filter-select"><option>全部</option><option>B1层</option><option>1F</option><option>2F</option><option>3F</option><option>4F</option><option>5F</option></select>
+        </div>
+      </div>
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>设备名称</th><th>设备类型</th><th>所在区域</th><th>状态</th><th>最后通讯</th><th>操作</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>感烟探测器 SM-088</td>
+              <td>感烟探测器</td>
+              <td>B1层·设备机房</td>
+              <td><span class="tag-online">在线</span></td>
+              <td>15:42:01</td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看设备详情')">详情</button></td>
+            </tr>
+            <tr>
+              <td>感温探测器 T-034</td>
+              <td>感温探测器</td>
+              <td>4F层·茶水间</td>
+              <td><span class="tag-online">在线</span></td>
+              <td>14:18:41</td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看设备详情')">详情</button></td>
+            </tr>
+            <tr>
+              <td>感烟探测器 SM-047</td>
+              <td>感烟探测器</td>
+              <td>3F层·东北区</td>
+              <td><span class="tag-offline">离线</span></td>
+              <td>13:55:22（26h前）</td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看设备详情')">详情</button></td>
+            </tr>
+            <tr>
+              <td>水压传感器 WP-B1-012</td>
+              <td>水压传感器</td>
+              <td>B1层·消防泵房</td>
+              <td><span class="tag-online">在线</span></td>
+              <td>12:05:33</td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看设备详情')">详情</button></td>
+            </tr>
+            <tr>
+              <td>摄像头 CAM-023</td>
+              <td>摄像头</td>
+              <td>2F层·通道</td>
+              <td><span class="tag-online">在线</span></td>
+              <td>13:20:08</td>
+              <td class="td-actions"><button class="btn-sm" onclick="showToast('查看设备详情')">详情</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <span style="flex:1;font-size:11px;color:rgba(255,255,255,.35)">共 250 台 · 在线 247 · 离线 2 · 异常 1</span>
+      <button class="btn-secondary" onclick="closeModal('modal-device-list')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗4：派单（值班人员派单按钮） ══ -->
+<div class="modal-overlay" id="modal-dispatch" onclick="if(event.target===this)closeModal('modal-dispatch')">
+  <div class="modal-box" style="width:520px">
+    <div class="modal-header">
+      <h3>转工单</h3>
+      <button class="modal-close" onclick="closeModal('modal-dispatch')">✕</button>
+    </div>
+    <div class="modal-content">
+      <!-- 告警信息摘要 -->
+      <div class="dispatch-alarm-info">
+        <div class="dispatch-info-row"><span class="lbl">告警设备</span><span class="val">感烟探测器 SM-047</span></div>
+        <div class="dispatch-info-row"><span class="lbl">告警区域</span><span class="val">3F层·东北区</span></div>
+        <div class="dispatch-info-row"><span class="lbl">告警类型</span><span class="val">设备离线</span></div>
+        <div class="dispatch-info-row"><span class="lbl">告警时间</span><span class="val">2026-05-05 13:55:22</span></div>
+      </div>
+      <!-- 表单 -->
+      <div class="form-group">
+        <label class="form-label">工单类型 <span class="form-required">*</span></label>
+        <select class="form-select"><option value="">请选择</option><option>设备维修</option><option>设备更换</option><option>现场检查</option><option>误报处理</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">紧急程度 <span class="form-required">*</span></label>
+        <div class="form-radio-group">
+          <label class="form-radio"><input type="radio" name="urgency" value="normal" checked><span>一般</span></label>
+          <label class="form-radio"><input type="radio" name="urgency" value="important"><span>重要</span></label>
+          <label class="form-radio"><input type="radio" name="urgency" value="urgent"><span>紧急</span></label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">指派人员 <span class="form-required">*</span></label>
+        <select class="form-select"><option value="">请选择</option><option>张明远·消防值班长</option><option>李建国·物业消防专管</option><option>王磊·维保工程师</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">问题描述</label>
+        <textarea class="form-textarea" placeholder="请输入问题描述" maxlength="100"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-dispatch')">取消</button>
+      <button class="btn-primary" onclick="showToast('工单已创建并指派');closeModal('modal-dispatch')">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗5：应急调度（值班人员调度按钮） ══ -->
+<div class="modal-overlay" id="modal-emergency-dispatch" onclick="if(event.target===this)closeModal('modal-emergency-dispatch')">
+  <div class="modal-box" style="width:560px">
+    <div class="modal-header">
+      <h3>📡 应急调度</h3>
+      <button class="modal-close" onclick="closeModal('modal-emergency-dispatch')">✕</button>
+    </div>
+    <div class="modal-content">
+      <div class="dispatch-header-info">
+        <div class="dispatch-info-row"><span class="lbl">调度编号</span><span class="val" style="color:#00D4FF">DSP-20260505-001</span></div>
+        <div class="dispatch-info-row"><span class="lbl">调度主题</span><span class="val">B1层设备机房告警应急调度</span></div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">调度类型 <span class="form-required">*</span></label>
+        <select class="form-select"><option value="">请选择</option><option>火灾扑救</option><option>人员疏散</option><option>设备故障</option><option>综合调度</option></select>
+      </div>
+      <div class="form-group">
+        <label class="form-label">事件等级 <span class="form-required">*</span></label>
+        <div class="form-radio-group">
+          <label class="form-radio"><input type="radio" name="dispatch-level" value="1"><span style="color:#FF3B30">一级（特别重大）</span></label>
+          <label class="form-radio"><input type="radio" name="dispatch-level" value="2" checked><span style="color:#FF9500">二级（重大）</span></label>
+          <label class="form-radio"><input type="radio" name="dispatch-level" value="3"><span style="color:#FFC107">三级（较大）</span></label>
+          <label class="form-radio"><input type="radio" name="dispatch-level" value="4"><span>四级（一般）</span></label>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">调度人员</label>
+        <div class="dispatch-person-list">
+          <div class="dispatch-person-item">
+            <span class="dispatch-person-name">👨‍🚒 张明远</span>
+            <span class="dispatch-person-role">消防值班长</span>
+            <span class="dispatch-person-status online">在线</span>
+          </div>
+          <div class="dispatch-person-item">
+            <span class="dispatch-person-name">👷 李建国</span>
+            <span class="dispatch-person-role">物业消防专管</span>
+            <span class="dispatch-person-status online">在线</span>
+          </div>
+          <div class="dispatch-person-item">
+            <span class="dispatch-person-name">🚒 朝阳消防中队</span>
+            <span class="dispatch-person-role">消防队</span>
+            <span class="dispatch-person-status">预计到场 7:22</span>
+          </div>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">调度说明</label>
+        <textarea class="form-textarea" placeholder="请输入调度说明" maxlength="200"></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-emergency-dispatch')">取消</button>
+      <button class="btn-primary" style="background:#FF9500" onclick="showToast('调度已发起');closeModal('modal-emergency-dispatch')">发起调度</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗6：巡检任务详情（巡检任务行点击） ══ -->
+<div class="modal-overlay" id="modal-inspect-detail" onclick="if(event.target===this)closeModal('modal-inspect-detail')">
+  <div class="modal-box" style="width:700px">
+    <div class="modal-header">
+      <h3>巡检任务详情</h3>
+      <button class="modal-close" onclick="closeModal('modal-inspect-detail')">✕</button>
+    </div>
+    <div class="modal-content">
+      <!-- 基本信息 -->
+      <div class="detail-grid">
+        <div class="detail-item"><span class="lbl">任务名称</span><span class="val">B1层日常巡检-0505</span></div>
+        <div class="detail-item"><span class="lbl">任务类型</span><span class="val">日常巡检</span></div>
+        <div class="detail-item"><span class="lbl">巡查员</span><span class="val">王磊</span></div>
+        <div class="detail-item"><span class="lbl">任务状态</span><span class="val"><span class="tag-progress">进行中</span></span></div>
+        <div class="detail-item"><span class="lbl">开始日期</span><span class="val">2026-05-05</span></div>
+        <div class="detail-item"><span class="lbl">结束日期</span><span class="val">2026-05-05</span></div>
+        <div class="detail-item"><span class="lbl">任务进度</span><span class="val"><div class="progress-bar" style="width:120px;display:inline-block;vertical-align:middle"><div class="progress-fill" style="width:80%;background:#4CAF50"></div></div> 8/10</span></div>
+        <div class="detail-item"><span class="lbl">发现隐患</span><span class="val" style="color:#FF3B30;font-weight:600">2</span></div>
+      </div>
+      <!-- 巡查点列表 -->
+      <div class="inspect-points">
+        <div class="inspect-points-title">巡查点列表</div>
+        <div class="inspect-point-item active" onclick="this.parentElement.querySelectorAll('.inspect-point-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')">
+          <div class="inspect-point-header">
+            <span class="inspect-point-name">巡检点1 · B1层设备机房</span>
+            <span class="tag-abnormal">异常</span>
+          </div>
+          <div class="inspect-point-detail">
+            <div class="detail-grid" style="margin-bottom:8px">
+              <div class="detail-item"><span class="lbl">巡查结果</span><span class="val"><span class="tag-abnormal">异常</span></span></div>
+              <div class="detail-item"><span class="lbl">巡查员</span><span class="val">王磊</span></div>
+              <div class="detail-item"><span class="lbl">巡查时间</span><span class="val">15:30:00</span></div>
+              <div class="detail-item"><span class="lbl">发现隐患</span><span class="val" style="color:#FF3B30">1 <button class="btn-link" onclick="showToast('查看关联工单')">查看关联工单</button></span></div>
+            </div>
+            <table class="data-table data-table-sm">
+              <thead><tr><th>消防设施</th><th>消防部件</th><th>巡查标准</th><th>结果</th></tr></thead>
+              <tbody>
+                <tr><td>火灾报警系统</td><td>火灾报警控制器</td><td>1.外观正常 2.工作状态正常</td><td><span class="tag-done">正常</span></td></tr>
+                <tr><td>自动喷水灭火系统</td><td>湿式报警阀组</td><td>1.外观正常 2.压力正常</td><td><span class="tag-abnormal">异常</span></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="inspect-point-item" onclick="this.parentElement.querySelectorAll('.inspect-point-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')">
+          <div class="inspect-point-header">
+            <span class="inspect-point-name">巡检点2 · B1层消防泵房</span>
+            <span class="tag-done">正常</span>
+          </div>
+        </div>
+        <div class="inspect-point-item" onclick="this.parentElement.querySelectorAll('.inspect-point-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')">
+          <div class="inspect-point-header">
+            <span class="inspect-point-name">巡检点3 · B1层配电室</span>
+            <span class="tag-abnormal">异常</span>
+          </div>
+        </div>
+        <div class="inspect-point-item" onclick="this.parentElement.querySelectorAll('.inspect-point-item').forEach(i=>i.classList.remove('active'));this.classList.add('active')">
+          <div class="inspect-point-header">
+            <span class="inspect-point-name">巡检点4 · B1层走廊通道</span>
+            <span class="tag-done">正常</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="closeModal('modal-inspect-detail')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  数据定义
+// ════════════════════════════════════════════════
+const FLOORS=[
+  {id:0,label:'B1',y:-3.5,h:3.5,people:12, devices:24,status:'alarm', theme:'停车场/设备机房',   alarmText:'手动报警按钮 MCP-B1-003 触发'},
+  {id:1,label:'1F',y:0,   h:4.0,people:25, devices:38,status:'normal',theme:'门厅/接待区/消控室', alarmText:''},
+  {id:2,label:'2F',y:4.0, h:3.6,people:47, devices:42,status:'normal',theme:'开放办公区A/B',       alarmText:''},
+  {id:3,label:'3F',y:7.6, h:3.6,people:84, devices:50,status:'warn',  theme:'大会议室/小会议室×3',alarmText:'感烟探测器 S3-NE-047 离线'},
+  {id:4,label:'4F',y:11.2,h:3.6,people:61, devices:45,status:'normal',theme:'独立办公室×4/开放区', alarmText:''},
+  {id:5,label:'5F',y:14.8,h:3.6,people:38, devices:40,status:'normal',theme:'餐厅/厨房/休息室',    alarmText:''},
+];
+
+// ── 新图层定义 ──
+const LAYERS=[
+  {id:'L0', name:'建筑基础白模',   color:'#A0B8D0',on:true, locked:true},
+  {id:'L3', name:'视频监控点位',   color:'#9C88FF',on:false},
+  {id:'L4', name:'人员热力定位',   color:'#FFC107',on:false},
+  {id:'L5', name:'逃生路径',       color:'#4CAF50',on:false},
+  {id:'L6', name:'烟气蔓延推演',   color:'#E24B4A',on:false},
+  {id:'L7', name:'危险品分布',     color:'#FF6B35',on:false},
+  {id:'L8', name:'消防管网水系',   color:'#29B6F6',on:false},
+  {id:'LA', name:'独立式温感系统', color:'#FF9060',on:true,  icon:'🌡'},
+  {id:'LB', name:'火灾报警系统',   color:'#FF4444',on:true,  icon:'🔔'},
+  {id:'LC', name:'电气火灾系统',   color:'#FFD700',on:false, icon:'⚡'},
+  {id:'LD', name:'可燃气体系统',   color:'#80FF80',on:false, icon:'💨'},
+  {id:'LE', name:'防排烟系统',     color:'#40C8FF',on:false, icon:'🌀'},
+  {id:'LF', name:'防火门控系统',   color:'#FF80C0',on:false, icon:'🚪'},
+  {id:'LG', name:'其他控制系统',   color:'#A0A0C0',on:false, icon:'⚙'},
+  {id:'LH', name:'巡检点',         color:'#80FFFF',on:false, icon:'📍'},
+  {id:'LI', name:'巡检路线',       color:'#40A0FF',on:false},
+];
+
+// 侧边栏图层图标（小型 SVG 内联）
+const LAYER_ICONS={
+  LA:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="12" y1="2" x2="12" y2="14"/><circle cx="12" cy="18" r="4"/><line x1="14" y1="6" x2="18" y2="6"/><line x1="14" y1="10" x2="16" y2="10"/></svg>',
+  LB:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><line x1="12" y1="22" x2="12" y2="22" stroke-width="4"/></svg>',
+  LC:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
+  LD:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 8 Q6 5 9 8 Q12 11 15 8 Q18 5 21 8"/><path d="M3 14 Q6 11 9 14 Q12 17 15 14 Q18 11 21 14"/></svg>',
+  LE:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="2"/><path d="M12 10 C10 7 6 7 6 10 C6 12 10 12 12 12"/><path d="M12 12 C15 11 16 7 14 6 C12 5 11 9 12 12"/><path d="M12 12 C11 15 14 18 16 16 C18 14 14 13 12 12"/></svg>',
+  LF:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><rect x="3" y="2" width="18" height="20" rx="1"/><line x1="12" y1="2" x2="12" y2="22"/><circle cx="9" cy="12" r="1.2" fill="currentColor"/></svg>',
+  LG:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12"/></svg>',
+  LH:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 22s-8-6.686-8-12a8 8 0 1 1 16 0c0 5.314-8 12-8 12z"/><circle cx="12" cy="10" r="3"/></svg>',
+};
+
+const PRESETS={
+  daily: ['L0','LB','LA'],
+  war:   ['L0','LB','L4','L5','L7','LC'],
+  drill: ['L0','L4','L5','L6','L7'],
+  patrol:['L0','LB','LH','LI'],
+};
+
+const MODE_CFG={
+  cruise:  {on:['L0','LB','LA'],       auto:[]},
+  alarm:   {on:['L0','LB','LA'],       auto:['L3','L4','L5','LE','LF']},
+  command: {on:['L0','LB'],            auto:['L4','L5','L7','L8','LE']},
+  public:  {on:['L0','L4'],            auto:['L5']},
+  office:  {on:['L0','LB','LA'],       auto:['LH','LI']},
+};
+
+// 楼层平面图房间数据 [xp%,yp%,wp%,hp%,label,type]
+const FLOOR_ROOMS={
+  0:[[5,5,55,60,'地下停车场','parking'],[62,5,33,30,'设备机房','control'],[62,37,16,28,'配电室','control'],[80,37,15,28,'危险品库','danger'],[5,67,90,8,'通道','corridor'],[5,77,43,18,'消防水泵房','control'],[50,77,45,18,'消防水箱间','control']],
+  1:[[5,5,40,34,'接待大厅','lobby'],[47,5,48,34,'等候区','office'],[5,41,20,38,'消防控制室','control'],[27,41,68,10,'走廊','corridor'],[27,53,35,22,'会客室A','meeting'],[64,53,31,22,'会客室B','meeting'],[5,77,90,8,'消防通道','corridor']],
+  2:[[5,5,42,44,'开放办公区A','office'],[49,5,46,44,'开放办公区B','office'],[5,51,30,18,'会议室2-A','meeting'],[37,51,25,18,'会议室2-B','meeting'],[64,51,31,18,'储藏室','storage'],[5,71,90,9,'走廊','corridor'],[5,82,43,12,'茶水间','utility'],[50,82,45,12,'卫生间','utility']],
+  3:[[5,5,58,42,'大会议室（100人）','meeting-large'],[65,5,30,42,'小会议室3-A','meeting'],[5,49,28,22,'小会议室3-B','meeting'],[35,49,28,22,'小会议室3-C','meeting'],[65,49,30,22,'休息等候区','office'],[5,73,90,9,'走廊','corridor'],[5,84,60,11,'文印/茶水间','utility'],[67,84,28,11,'楼梯间','corridor']],
+  4:[[5,5,20,42,'独立办公4-A','office'],[27,5,20,42,'独立办公4-B','office'],[49,5,20,42,'独立办公4-C','office'],[71,5,24,42,'独立办公4-D','office'],[5,49,90,22,'开放办公区','office'],[5,73,90,9,'走廊','corridor'],[5,84,90,11,'公共区域','utility']],
+  5:[[5,5,55,44,'员工餐厅','office'],[62,5,33,44,'厨房','kitchen'],[5,51,35,22,'休息室A','meeting'],[42,51,30,22,'休息室B','meeting'],[74,51,21,22,'储藏间','storage'],[5,75,90,9,'走廊','corridor'],[5,86,90,9,'楼梯/电梯间','corridor']],
+};
+
+// 逃生路径（沿走廊走，不穿墙），百分比坐标
+const ESCAPE_ROUTES={
+  // [起点x%,起点y%] → [走廊x%,走廊y%] → [楼梯x%,走廊y%] → [出口x%,出口y%]
+  3:[
+    // 主路线：从大会议室出 → 走廊 → 东侧楼梯 → 出口
+    [{x:34,y:46},{x:34,y:77},{x:88,y:77},{x:88,y:95}],
+    // 备选：走廊 → 西侧出口
+    [{x:34,y:46},{x:34,y:77},{x:8,y:77},{x:8,y:95}],
+  ],
+  2:[
+    [{x:28,y:49},{x:28,y:75},{x:88,y:75},{x:88,y:95}],
+    [{x:72,y:49},{x:72,y:75},{x:8,y:75},{x:8,y:95}],
+  ],
+  1:[
+    [{x:50,y:39},{x:50,y:45},{x:88,y:45},{x:88,y:85}],
+    [{x:18,y:39},{x:18,y:45},{x:8,y:45},{x:8,y:85}],
+  ],
+  0:[
+    [{x:30,y:65},{x:30,y:71},{x:88,y:71},{x:88,y:95}],
+    [{x:30,y:65},{x:30,y:71},{x:8,y:71},{x:8,y:95}],
+  ],
+};
+
+let layerState={};
+LAYERS.forEach(l=>{ layerState[l.id]=l.on; });
+let currentMode='cruise', currentView='standard', smokeTime=0;
+let selectedFloor=-1, openPanel=null, pulse=0;
+
+// ════════════════════════════════════════════════
+//  Three.js 主场景
+// ════════════════════════════════════════════════
+const canvas3d=document.getElementById('three-canvas');
+const mainView=document.getElementById('main-view');
+const renderer=new THREE.WebGLRenderer({canvas:canvas3d,antialias:true,alpha:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.shadowMap.enabled=true;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x060D18);
+scene.fog=new THREE.FogExp2(0x060D18,0.013);
+
+const camera=new THREE.PerspectiveCamera(50,1,0.1,500);
+let sph={theta:0.8,phi:0.82,r:42};
+let tgt=new THREE.Vector3(0,8,0);
+function updateCamera(){
+  camera.position.set(tgt.x+sph.r*Math.sin(sph.phi)*Math.sin(sph.theta),tgt.y+sph.r*Math.cos(sph.phi),tgt.z+sph.r*Math.sin(sph.phi)*Math.cos(sph.theta));
+  camera.lookAt(tgt);
+}
+updateCamera();
+
+scene.add(new THREE.AmbientLight(0x1A2F4A,1.6));
+const sunL=new THREE.DirectionalLight(0x4A90D9,0.9);
+sunL.position.set(15,30,20);sunL.castShadow=true;scene.add(sunL);
+const fillL=new THREE.DirectionalLight(0x1A3A5A,0.4);fillL.position.set(-10,20,-10);scene.add(fillL);
+
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(150,150),new THREE.MeshStandardMaterial({color:0x080F1A}));
+ground.rotation.x=-Math.PI/2;ground.position.y=-0.05;scene.add(ground);
+const grid=new THREE.GridHelper(120,60,0x1A3A5A,0x0D2035);
+grid.material.transparent=true;grid.material.opacity=0.4;scene.add(grid);
+
+const BW=16,BD=12;
+const floorGroups=[],floorMeshes=[];
+const allSprites=[];   // all sprites/devices for raycast
+const routeMeshes=[],routeMats=[];
+const smokeMeshes=[],smokeMats=[];
+const heatMeshes=[],heatMats=[];
+const camMeshes=[],camMats=[];
+const pipeMeshes=[],pipeMats=[];
+const dangerMeshes=[],dangerMats=[];
+const patrolPoints=[],patrolRoutes=[];
+
+// ── 楼层建筑 ──
+FLOORS.forEach((fl,idx)=>{
+  const grp=new THREE.Group();
+  const slabM=new THREE.MeshStandardMaterial({color:0x2A4060,transparent:true,opacity:0.75});
+  const slab=new THREE.Mesh(new THREE.BoxGeometry(BW,0.2,BD),slabM);
+  slab.position.y=fl.y;grp.add(slab);
+  const wallM=new THREE.MeshStandardMaterial({color:0x1E3348,transparent:true,opacity:0.26,roughness:0.6,metalness:0.2,side:THREE.DoubleSide,depthWrite:false});
+  const wall=new THREE.Mesh(new THREE.BoxGeometry(BW,fl.h-0.2,BD),wallM);
+  wall.position.y=fl.y+fl.h/2;
+  wall.userData={type:'floor',floorId:fl.id,label:fl.label};
+  grp.add(wall);
+  const edgeG=new THREE.EdgesGeometry(new THREE.BoxGeometry(BW,fl.h,BD));
+  const edgeM=new THREE.LineBasicMaterial({color:0x4A90D9,transparent:true,opacity:0.4});
+  const edges=new THREE.LineSegments(edgeG,edgeM);
+  edges.position.y=fl.y+fl.h/2;grp.add(edges);
+  const xrayM=new THREE.LineBasicMaterial({color:0x1A9BCB,transparent:true,opacity:0});
+  const xray=new THREE.LineSegments(edgeG.clone(),xrayM);
+  xray.position.y=fl.y+fl.h/2;grp.add(xray);
+  floorGroups.push(grp);
+  floorMeshes.push({grp,slab,slabM,wall,wallM,edges,edgeM,xray,xrayM,fl});
+  scene.add(grp);
+});
+
+// ── 线性图标绘制（Canvas 2D 路径，无 emoji）──
+function drawLineIcon(ctx, type){
+  const c=64, r=32;
+  ctx.strokeStyle='rgba(255,255,255,0.95)';
+  ctx.lineWidth=6; ctx.lineCap='round'; ctx.lineJoin='round';
+  switch(type){
+    case 'LA':{ // 温感 — 温度计
+      ctx.beginPath();ctx.moveTo(c,c-r);ctx.lineTo(c,c+r*0.28);ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c+r*0.52,r*0.22,0,Math.PI*2);ctx.stroke();
+      [[c+r*0.15,c-r*0.55],[c+r*0.15,c-r*0.2],[c+r*0.15,c+r*0.1]].forEach(([x,y])=>{
+        ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+r*0.38,y);ctx.stroke();});
+      break;}
+    case 'LB':{ // 火灾报警 — 铃铛
+      ctx.beginPath();ctx.arc(c,c-r*0.1,r*0.55,Math.PI*1.12,Math.PI*1.88);
+      ctx.lineTo(c+r*0.55,c+r*0.38);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(c-r*0.6,c+r*0.38);ctx.lineTo(c+r*0.6,c+r*0.38);ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c+r*0.62,r*0.12,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c-r*0.78,r*0.1,Math.PI,0);ctx.stroke();
+      break;}
+    case 'LC':{ // 电气 — 闪电
+      ctx.beginPath();
+      ctx.moveTo(c+r*0.18,c-r);ctx.lineTo(c-r*0.22,c+r*0.08);
+      ctx.lineTo(c+r*0.05,c+r*0.08);ctx.lineTo(c-r*0.18,c+r);ctx.stroke();
+      break;}
+    case 'LD':{ // 可燃气体 — 波浪线
+      [-0.38,0,0.38].forEach(dy=>{
+        ctx.beginPath();
+        ctx.moveTo(c-r*0.55,c+dy*r);
+        ctx.quadraticCurveTo(c-r*0.18,c+dy*r-r*0.22,c,c+dy*r);
+        ctx.quadraticCurveTo(c+r*0.18,c+dy*r+r*0.22,c+r*0.55,c+dy*r);
+        ctx.stroke();});
+      break;}
+    case 'LE':{ // 防排烟 — 风扇叶片
+      for(let i=0;i<3;i++){
+        ctx.save();ctx.translate(c,c);ctx.rotate(i*Math.PI*2/3);
+        ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-r*0.62);
+        ctx.arc(-r*0.24,-r*0.6,r*0.24,-Math.PI/2,Math.PI*0.55);
+        ctx.stroke();ctx.restore();}
+      ctx.beginPath();ctx.arc(c,c,r*0.13,0,Math.PI*2);ctx.stroke();
+      break;}
+    case 'LF':{ // 防火门 — 门
+      ctx.beginPath();ctx.rect(c-r*0.48,c-r*0.72,r*0.96,r*1.38);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(c,c-r*0.72);ctx.lineTo(c,c+r*0.66);ctx.stroke();
+      ctx.beginPath();ctx.arc(c-r*0.14,c+r*0.02,r*0.09,0,Math.PI*2);ctx.stroke();
+      break;}
+    case 'LG':{ // 其他控制 — 齿轮
+      ctx.beginPath();ctx.arc(c,c,r*0.3,0,Math.PI*2);ctx.stroke();
+      for(let i=0;i<8;i++){
+        ctx.save();ctx.translate(c,c);ctx.rotate(i*Math.PI/4);
+        ctx.beginPath();ctx.moveTo(0,-r*0.3);ctx.lineTo(0,-r*0.62);ctx.stroke();
+        ctx.restore();}
+      break;}
+    case 'LH':{ // 巡检点 — 定位针
+      ctx.beginPath();ctx.arc(c,c-r*0.2,r*0.38,0,Math.PI*2);ctx.stroke();
+      const ang=Math.PI/2-Math.acos(0);
+      ctx.beginPath();
+      ctx.moveTo(c-r*0.38*Math.cos(Math.PI/6),c-r*0.2+r*0.38*Math.sin(Math.PI/6));
+      ctx.lineTo(c,c+r*0.78);
+      ctx.lineTo(c+r*0.38*Math.cos(Math.PI/6),c-r*0.2+r*0.38*Math.sin(Math.PI/6));
+      ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c-r*0.2,r*0.12,0,Math.PI*2);ctx.stroke();
+      break;}
+    case 'camera':{ // 摄像头 — 相机
+      ctx.beginPath();ctx.rect(c-r*0.6,c-r*0.38,r*1.2,r*0.78);ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c,r*0.26,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(c-r*0.22,c-r*0.38);ctx.lineTo(c-r*0.22,c-r*0.6);
+      ctx.lineTo(c+r*0.22,c-r*0.6);ctx.lineTo(c+r*0.22,c-r*0.38);ctx.stroke();
+      break;}
+    case 'danger':{ // 危险品 — 三角感叹号
+      ctx.beginPath();ctx.moveTo(c,c-r);ctx.lineTo(c+r*0.88,c+r*0.5);
+      ctx.lineTo(c-r*0.88,c+r*0.5);ctx.closePath();ctx.stroke();
+      ctx.beginPath();ctx.moveTo(c,c-r*0.28);ctx.lineTo(c,c+r*0.2);ctx.stroke();
+      ctx.beginPath();ctx.arc(c,c+r*0.38,r*0.07,0,Math.PI*2);ctx.fill();
+      break;}
+    default:{ // 通用 — 圆圈叉
+      ctx.beginPath();ctx.arc(c,c,r*0.5,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(c-r*0.28,c-r*0.28);ctx.lineTo(c+r*0.28,c+r*0.28);
+      ctx.moveTo(c+r*0.28,c-r*0.28);ctx.lineTo(c-r*0.28,c+r*0.28);ctx.stroke();}
+  }
+}
+
+// ── Icon Sprite 生成（线性图标版） ──
+function makeIconSprite(iconType,bgColor,size,ud){
+  const cv=document.createElement('canvas'); cv.width=cv.height=128;
+  const ctx=cv.getContext('2d');
+  // 背景圆
+  ctx.fillStyle=bgColor;
+  ctx.beginPath();ctx.arc(64,64,58,0,Math.PI*2);ctx.fill();
+  // 边缘光圈
+  ctx.strokeStyle='rgba(255,255,255,0.25)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.arc(64,64,58,0,Math.PI*2);ctx.stroke();
+  // 线性图标
+  drawLineIcon(ctx, iconType);
+  const tex=new THREE.CanvasTexture(cv);
+  const mat=new THREE.SpriteMaterial({map:tex,transparent:true,depthTest:false});
+  const sp=new THREE.Sprite(mat);
+  sp.scale.set(size,size,1);
+  if(ud) sp.userData=ud;
+  return sp;
+}
+
+// ── 设备系统层（LA~LG）──
+const SYSTEM_CFG={
+  LA:{iconType:'LA',bg:'rgba(240,110,30,0.88)', size:0.75,yOff:0.5},
+  LB:{iconType:'LB',bg:'rgba(210,30,30,0.92)',  size:0.85,yOff:0.8},
+  LC:{iconType:'LC',bg:'rgba(180,140,0,0.88)',  size:0.75,yOff:0.6},
+  LD:{iconType:'LD',bg:'rgba(30,160,60,0.88)',  size:0.75,yOff:0.5},
+  LE:{iconType:'LE',bg:'rgba(20,140,210,0.88)', size:0.85,yOff:0.9},
+  LF:{iconType:'LF',bg:'rgba(180,40,130,0.88)', size:0.8, yOff:0.6},
+  LG:{iconType:'LG',bg:'rgba(90,90,160,0.88)',  size:0.7, yOff:0.5},
+};
+const systemSprites={LA:[],LB:[],LC:[],LD:[],LE:[],LF:[],LG:[]};
+
+FLOORS.forEach(fl=>{
+  Object.entries(SYSTEM_CFG).forEach(([lid,cfg])=>{
+    const count=Math.floor((fl.devices/7)+1);
+    const seed=fl.id*100+lid.charCodeAt(1);
+    for(let i=0;i<count;i++){
+      const isAlarm=fl.status==='alarm'&&lid==='LB';
+      const bg=isAlarm?'rgba(200,20,20,0.95)':cfg.bg;
+      const sp=makeIconSprite(cfg.iconType,bg,cfg.size,{
+        type:'device',lid,floor:fl.label,floorId:fl.id,
+        status:isAlarm?'alarm':'normal',
+        id:`${fl.label}-${lid}-${String(i).padStart(2,'0')}`,
+        sysName:LAYERS.find(l=>l.id===lid)?.name||lid,
+      });
+      sp.position.set(
+        (((seed+i*73)%89+5)/100)*BW-BW/2,
+        fl.y+fl.h*0.55+cfg.yOff,
+        (((seed+i*53)%85+5)/100)*BD-BD/2
+      );
+      scene.add(sp);
+      systemSprites[lid].push(sp);
+      allSprites.push(sp);
+    }
+  });
+});
+
+// ── 巡检点（LH）──
+const patrolSprites=[];
+FLOORS.forEach(fl=>{
+  for(let i=0;i<3;i++){
+    const sp=makeIconSprite('LH','rgba(40,200,200,0.9)',0.7,{
+      type:'patrol',floor:fl.label,floorId:fl.id,
+      id:`PT-${fl.label}-${i+1}`,name:`巡检点 ${fl.label}-${i+1}`,
+    });
+    const s2=fl.id*50+i*17;
+    sp.position.set(((s2*31)%70+15)/100*BW-BW/2,fl.y+fl.h*0.55+0.5,(((s2+11)*41)%70+15)/100*BD-BD/2);
+    scene.add(sp);patrolSprites.push(sp);allSprites.push(sp);
+  }
+});
+
+// ── 逃生路径（3D空间中，沿走廊）──
+function makeRoute3DPts(routes3d){
+  const pts=routes3d.map(p=>new THREE.Vector3(...p));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const geo=new THREE.TubeGeometry(curve,40,0.07,6,false);
+  const mat=new THREE.MeshStandardMaterial({color:0x4CAF50,emissive:0x208030,emissiveIntensity:1.5,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(geo,mat);
+  mesh.userData={type:'route',status:'recommended',len:Math.round(pts.reduce((a,_,i)=>i?a+pts[i].distanceTo(pts[i-1]):a,0)*3)};
+  return {mesh,mat};
+}
+
+// 路径沿走廊（z=3.36 是走廊中心，y由楼层决定）
+const ROUTE_3D_DEFS=[
+  // 3F: 走廊z≈3.36, 东侧楼梯x≈6
+  {pts:[[-2,9.0,-2.5],[-2,9.0,3.2],[6.5,9.0,3.2],[7.5,9.0,6.0]],color:0x4CAF50},
+  {pts:[[-2,9.0,-2.5],[-2,9.0,3.2],[-6.5,9.0,3.2],[-7.5,9.0,6.0]],color:0x2196F3},
+  // 2F
+  {pts:[[2,5.6,0],[2,5.6,2.6],[6.5,5.6,2.6],[7.5,5.6,6.0]],color:0x4CAF50},
+  // B1
+  {pts:[[0,-1.5,0],[0,-1.5,2.2],[6.5,-1.5,2.2],[7.5,-1.5,6.0]],color:0xFF6B35},
+];
+
+ROUTE_3D_DEFS.forEach(def=>{
+  const pts=def.pts.map(p=>new THREE.Vector3(...p));
+  const curve=new THREE.CatmullRomCurve3(pts);
+  const mat=new THREE.MeshStandardMaterial({color:def.color,emissive:new THREE.Color(def.color),emissiveIntensity:1.5,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,40,0.07,6,false),mat);
+  mesh.userData={type:'route',status:'recommended',len:Math.round(pts.reduce((a,_,i)=>i?a+pts[i].distanceTo(pts[i-1]):a,0)*3)};
+  scene.add(mesh);routeMeshes.push(mesh);routeMats.push(mat);
+});
+
+// ── 烟气 ──
+[[0,-1.5,0,14,2.5,10],[0,2.5,0,10,2.5,8],[0,6,0,6,2.5,5]].forEach(d=>{
+  const mat=new THREE.MeshStandardMaterial({color:0x3D2B1F,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(new THREE.BoxGeometry(d[3],d[4],d[5]),mat);
+  mesh.position.set(d[0],d[1],d[2]);scene.add(mesh);smokeMeshes.push(mesh);smokeMats.push(mat);
+});
+
+// ── 热力图 ──
+FLOORS.forEach(fl=>{
+  const d=fl.people/220,c=new THREE.Color();c.setHSL(0.6-d*0.52,0.85,0.4);
+  const mat=new THREE.MeshStandardMaterial({color:c,transparent:true,opacity:0,depthWrite:false,side:THREE.DoubleSide});
+  const mesh=new THREE.Mesh(new THREE.PlaneGeometry(BW-1,BD-1),mat);
+  mesh.rotation.x=-Math.PI/2;mesh.position.set(0,fl.y+0.18,0);
+  scene.add(mesh);heatMeshes.push(mesh);heatMats.push(mat);
+});
+
+// ── 摄像头 ──
+[[7,10,5.5],[-7,10,5.5],[0,10,-5.5],[6,6.2,5.5],[-6,6.2,-5.5]].forEach((pos,i)=>{
+  const mat=new THREE.MeshStandardMaterial({color:0x9C88FF,emissive:0x4444AA,emissiveIntensity:0.6,transparent:true,opacity:0});
+  const m=new THREE.Mesh(new THREE.ConeGeometry(0.25,0.5,6),mat);
+  m.position.set(...pos);m.rotation.x=-Math.PI/4;
+  m.userData={type:'camera',id:`CAM-${i+1}`,floor:i<3?'3F':'2F'};
+  scene.add(m);camMeshes.push(m);camMats.push(mat);allSprites.push(m);
+});
+
+// ── 管网 ──
+[[-7,0,0,-7,16,0],[7,0,0,7,16,0],[-7,4,0,7,4,0],[-7,8,0,7,8,0],[-7,12,0,7,12,0]].forEach(p=>{
+  const from=new THREE.Vector3(p[0],p[1],p[2]),to=new THREE.Vector3(p[3],p[4],p[5]);
+  const len=from.distanceTo(to);
+  const mat=new THREE.MeshStandardMaterial({color:0x1E4B7A,emissive:0x1E4B7A,emissiveIntensity:0.6,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.08,len,6),mat);
+  mesh.position.copy(from.clone().add(to).multiplyScalar(0.5));mesh.lookAt(to);mesh.rotateX(Math.PI/2);
+  scene.add(mesh);pipeMeshes.push(mesh);pipeMats.push(mat);
+});
+
+// ── 危险品 ──
+[[-5,-1.5,-3,0xE24B4A,'甲类危险品','乙醇 120L'],[3,-1.5,4,0x2196F3,'气瓶','氮气 4支'],[-2,3.8,-4,0xFFC107,'丙类危险品','纸箱堆放']].forEach((d,i)=>{
+  const mat=new THREE.MeshStandardMaterial({color:d[3],emissive:new THREE.Color(d[3]),emissiveIntensity:0.8,transparent:true,opacity:0});
+  const mesh=new THREE.Mesh(new THREE.OctahedronGeometry(0.4),mat);
+  mesh.position.set(d[0],d[1],d[2]);mesh.userData={type:'danger',label:d[4],dtype:d[5]};
+  scene.add(mesh);dangerMeshes.push(mesh);dangerMats.push(mat);allSprites.push(mesh);
+});
+
+// ── 巡检路线（LI）──
+const patrolRouteMeshes=[];
+FLOORS.forEach(fl=>{
+  const pts=[
+    new THREE.Vector3(-6,fl.y+fl.h*0.55+0.2,-4),
+    new THREE.Vector3(0,fl.y+fl.h*0.55+0.2,-4),
+    new THREE.Vector3(4,fl.y+fl.h*0.55+0.2,0),
+    new THREE.Vector3(0,fl.y+fl.h*0.55+0.2,4),
+    new THREE.Vector3(-6,fl.y+fl.h*0.55+0.2,4),
+  ];
+  const mat=new THREE.LineDashedMaterial({color:0x40A0FF,dashSize:0.4,gapSize:0.2,transparent:true,opacity:0,linewidth:2});
+  const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),mat);
+  line.computeLineDistances();
+  line.userData={type:'patrolRoute',floor:fl.label};
+  scene.add(line);patrolRouteMeshes.push(line);
+});
+
+// ════════════════════════════════════════════════
+//  相机控制
+// ════════════════════════════════════════════════
+let isDrag=false,isRDrag=false,lastM={x:0,y:0};
+canvas3d.addEventListener('mousedown',e=>{isDrag=true;isRDrag=e.button===2;lastM={x:e.clientX,y:e.clientY};canvas3d.style.cursor='grabbing';});
+window.addEventListener('mouseup',()=>{isDrag=false;canvas3d.style.cursor='default';});
+window.addEventListener('mousemove',e=>{
+  if(!isDrag)return;
+  const dx=e.clientX-lastM.x,dy=e.clientY-lastM.y;lastM={x:e.clientX,y:e.clientY};
+  if(isRDrag){tgt.x-=dx*.04;tgt.y+=dy*.04;}
+  else{sph.theta-=dx*.008;sph.phi=Math.max(.18,Math.min(1.42,sph.phi+dy*.008));}
+  updateCamera();
+});
+canvas3d.addEventListener('wheel',e=>{sph.r=Math.max(10,Math.min(90,sph.r+e.deltaY*.05));updateCamera();updateLOD();});
+canvas3d.addEventListener('contextmenu',e=>e.preventDefault());
+canvas3d.addEventListener('dblclick',e=>{
+  const hit=doRaycast(e);
+  if(hit?.userData?.type==='floor') openFloorDetail(hit.userData.floorId);
+  else resetCamera();
+});
+window.addEventListener('keydown',e=>{if(e.key==='Escape'){closePanels();forceHideCard();}});
+
+function animNum(obj,key,to,dur){
+  const from=obj[key],start=performance.now();
+  (function s(n){const t=Math.min((n-start)/dur,1),e=t<.5?2*t*t:-1+(4-2*t)*t;obj[key]=from+(to-from)*e;updateCamera();t<1&&requestAnimationFrame(s);})(start);
+}
+function animVec(vec,to,dur){
+  const fx=vec.x,fy=vec.y,fz=vec.z,start=performance.now();
+  (function s(n){const t=Math.min((n-start)/dur,1),e=t<.5?2*t*t:-1+(4-2*t)*t;vec.x=fx+(to.x-fx)*e;vec.y=fy+(to.y-fy)*e;vec.z=fz+(to.z-fz)*e;updateCamera();t<1&&requestAnimationFrame(s);})(start);
+}
+function resetCamera(){animNum(sph,'theta',0.8,500);animNum(sph,'phi',0.82,500);animNum(sph,'r',42,500);animVec(tgt,{x:0,y:8,z:0},500);}
+
+// ── Raycast ──
+const raycaster=new THREE.Raycaster();
+const mouse2=new THREE.Vector2();
+function doRaycast(e){
+  const rect=canvas3d.getBoundingClientRect();
+  mouse2.x=((e.clientX-rect.left)/rect.width)*2-1;
+  mouse2.y=-((e.clientY-rect.top)/rect.height)*2+1;
+  raycaster.setFromCamera(mouse2,camera);
+  const objs=[...floorMeshes.map(f=>f.wall),...allSprites,...routeMeshes,...smokeMeshes,...dangerMeshes];
+  const hits=raycaster.intersectObjects(objs,false);
+  return hits.length?hits[0].object:null;
+}
+
+// ── LOD ──
+function updateLOD(){
+  const lod=sph.r>50?1:sph.r>25?2:3;
+  document.getElementById('view-lbl').textContent=`${currentView==='xray'?'X-Ray':'标准3D'} · LOD-${lod}`;
+  const showSystems=['LA','LB','LC','LD','LE','LF','LG'];
+  showSystems.forEach(lid=>{
+    systemSprites[lid].forEach(sp=>{
+      sp.visible=layerState[lid]&&(lod===1?sp.userData.status==='alarm':true);
+    });
+  });
+  patrolSprites.forEach(sp=>{sp.visible=layerState['LH'];});
+}
+
+// ════════════════════════════════════════════════
+//  视图切换
+// ════════════════════════════════════════════════
+function setView(v){
+  currentView=v;
+  document.querySelectorAll('.vo').forEach(el=>el.classList.remove('active'));
+  document.getElementById(v==='xray'?'vo-xray':'vo-std').classList.add('active');
+  document.getElementById('xray-badge').classList.toggle('show',v==='xray');
+  if(v==='xray'){
+    floorMeshes.forEach(fm=>{fm.wallM.opacity=0.04;fm.xrayM.opacity=0.8;fm.edgeM.color.set(0x1A9BCB);});
+    showToast('X-Ray 透视模式');
+  } else {
+    floorMeshes.forEach(fm=>{fm.wallM.opacity=0.26;fm.xrayM.opacity=0;fm.edgeM.color.set(0x4A90D9);});
+  }
+  updateLOD();
+}
+
+// ════════════════════════════════════════════════
+//  图层应用
+// ════════════════════════════════════════════════
+function applyLayers(){
+  const showSys=['LA','LB','LC','LD','LE','LF','LG'];
+  showSys.forEach(lid=>systemSprites[lid].forEach(sp=>{sp.visible=layerState[lid];}));
+  patrolSprites.forEach(sp=>{sp.visible=layerState['LH'];});
+  patrolRouteMeshes.forEach(m=>{m.material.opacity=layerState['LI']?0.8:0;});
+  routeMats.forEach(m=>{m.opacity=layerState['L5']?0.85:0;});
+  smokeMats.forEach((m,i)=>{m.opacity=layerState['L6']?getSmokeOp(i):0;});
+  heatMats.forEach(m=>{m.opacity=layerState['L4']?0.4:0;});
+  camMats.forEach(m=>{m.opacity=layerState['L3']?0.85:0;});
+  pipeMats.forEach(m=>{m.opacity=layerState['L8']?0.65:0;});
+  dangerMats.forEach(m=>{m.opacity=layerState['L7']?0.9:0;});
+  updateLOD();
+  if(selectedFloor>=0) setTimeout(()=>drawFloorPlan(selectedFloor),80);
+}
+function getSmokeOp(i){return([0,0.35,0.58,0.72,0.85,0.92][Math.min(smokeTime,5)]||0)*(1-i*0.28);}
+
+// ════════════════════════════════════════════════
+//  图层 & 模式 UI
+// ════════════════════════════════════════════════
+function buildLayerList(){
+  const cfg=MODE_CFG[currentMode]||MODE_CFG.cruise;
+  document.getElementById('layer-list-inner').innerHTML=LAYERS.map(l=>`
+  <div class="lr" onclick="toggleLayer('${l.id}')">
+    <div class="lr-dot" style="background:${l.color};box-shadow:0 0 4px ${l.color}44"></div>
+    <span class="lr-nm">${LAYER_ICONS[l.id]||''} ${l.name}</span>
+    ${cfg.auto.includes(l.id)?'<span class="lr-tag a">自动</span>':''}
+    ${l.locked?'<span class="lr-tag">常驻</span>':''}
+    <div class="tsw ${layerState[l.id]?'on':''}" id="tsw-${l.id}"></div>
+  </div>`).join('');
+}
+function buildFloorList(){
+  const sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};
+  document.getElementById('floor-list-inner').innerHTML=[...FLOORS].reverse().map(fl=>`
+  <div class="fl-row" onclick="openFloorDetail(${fl.id});closePanels()">
+    <div class="lr-dot" style="background:${sc[fl.status]}"></div>
+    <div style="flex:1"><div style="font-size:11px;color:#E8F4FF">${fl.label}<span style="font-size:9px;color:rgba(232,244,255,.38);margin-left:4px">${fl.theme.split('/')[0]}</span></div>
+    <div style="font-size:9px;color:rgba(232,244,255,.38);margin-top:1px">${fl.people}人 · ${fl.devices}台</div></div>
+    <span style="font-size:9px;color:${sc[fl.status]}">${fl.status==='alarm'?'告警':fl.status==='warn'?'警告':'正常'}</span>
+  </div>`).join('');
+}
+function updateLayerUI(){
+  LAYERS.forEach(l=>{
+    const e=document.getElementById(`tsw-${l.id}`);if(e)e.className=`tsw ${layerState[l.id]?'on':''}`;
+  });
+}
+function toggleLayer(id){
+  if(LAYERS.find(l=>l.id===id)?.locked){showToast('该图层不可关闭');return;}
+  layerState[id]=!layerState[id];updateLayerUI();applyLayers();
+}
+function applyPreset(name){
+  const pts=PRESETS[name];if(!pts)return;
+  LAYERS.forEach(l=>{if(!l.locked)layerState[l.id]=pts.includes(l.id);});
+  updateLayerUI();applyLayers();showToast('已应用预设');
+}
+
+// ════════════════════════════════════════════════
+//  模式切换
+// ════════════════════════════════════════════════
+function setMode(mode,btn){
+  currentMode=mode;
+  document.querySelectorAll('.mode-tab').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  else{const map={cruise:0,alarm:1,command:2,public:3,office:4};document.querySelectorAll('.mode-tab')[map[mode]]?.classList.add('active');}
+  document.querySelectorAll('.sc-btn').forEach(b=>b.classList.remove('active'));
+  const sm={cruise:'sb-cruise',alarm:'sb-alarm',command:'sb-command',public:'sb-public',office:'sb-office'};
+  document.getElementById(sm[mode])?.classList.add('active');
+  const cfg=MODE_CFG[mode]||MODE_CFG.cruise;
+  LAYERS.forEach(l=>{if(!l.locked)layerState[l.id]=cfg.on.includes(l.id)||cfg.auto.includes(l.id);});
+  updateLayerUI();applyLayers();
+  const isAlarm=mode==='alarm'||mode==='command';
+  document.getElementById('alarm-banner').classList.toggle('show',isAlarm);
+  document.getElementById('bc-alarm').textContent=isAlarm?'3':'0';
+  document.getElementById('bc-alarm').style.color=isAlarm?'#E24B4A':'#4CAF50';
+  document.getElementById('smoke-tl').classList.toggle('show',mode==='command');
+  syncFloorViewPos();
+  if(isAlarm){setTimeout(()=>openFloorDetail(0),300);showToast('⚠ 报警模式 · 已定位B1火情楼层');}
+  else showToast(`已切换至「${btn?.textContent||mode}」模式`);
+  if(mode==='command')setView('xray');
+  else if(currentView==='xray'&&mode!=='command')setView('standard');
+}
+function setSmokeTime(t){
+  smokeTime=t;
+  document.querySelectorAll('.stl-btn').forEach((b,i)=>b.classList.toggle('active',[0,1,3,5,10][i]===t));
+  applyLayers();showToast(`烟气推演 T+${t}min`);
+}
+
+// ════════════════════════════════════════════════
+//  楼层详情页（独立页面）
+// ════════════════════════════════════════════════
+
+// 鹰眼面板内的楼层导航列表
+function buildEagleNav(fid){
+  const sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};
+  const sl={normal:'正常',warn:'警告',alarm:'告警'};
+  document.getElementById('eagle-floor-list').innerHTML=
+    [...FLOORS].reverse().map(f=>`
+    <div class="efl-row${f.id===fid?' active':''}" onclick="switchFloor(${f.id})">
+      <span class="efl-dot" style="background:${sc[f.status]};box-shadow:0 0 4px ${sc[f.status]}66"></span>
+      <span class="efl-lbl">${f.label}</span>
+      <span class="efl-theme">${f.theme.split('/')[0]}</span>
+      <span class="efl-st" style="color:${sc[f.status]}">${sl[f.status]}</span>
+    </div>`).join('');
+}
+
+function updateFVHeader(fid){
+  const fl=FLOORS[fid];
+  document.getElementById('fv-floor-label').textContent=fl.label+' · '+fl.theme.split('/')[0];
+  document.getElementById('fv-floor-sub').textContent='防火分区 FA-0'+(fid+1)+' · 楼层详情';
+}
+
+function openFloorDetail(fid){
+  selectedFloor=fid;
+  // 截图作鹰眼缩略图
+  renderer.render(scene,camera);
+  document.getElementById('bldg-thumb').src=renderer.domElement.toDataURL('image/png');
+
+  updateFVHeader(fid);
+  buildEagleNav(fid);
+
+  document.getElementById('floor-view').classList.add('show');
+  syncFloorViewPos();
+  closePanels();
+  setTimeout(()=>drawFloorPlan(fid),100);
+  showToast(`${FLOORS[fid].label} · 楼层详情已打开`);
+}
+
+function closeFloorDetail(){
+  selectedFloor=-1;
+  document.getElementById('floor-view').classList.remove('show');
+  resetCamera();
+}
+
+function syncFloorViewPos(){
+  const fv=document.getElementById('floor-view');
+  const bannerShown=document.getElementById('alarm-banner').classList.contains('show');
+  fv.style.top=(bannerShown?82:48)+'px';
+}
+
+function switchFloor(fid){
+  selectedFloor=fid;
+  updateFVHeader(fid);
+  buildEagleNav(fid);
+  // 重置 BIM 视角，慢慢转到新楼层
+  bimSph={theta:0.8,phi:0.58,r:22};bimAutoRot=true;updateCamera2();
+  drawFloorPlan(fid);
+}
+
+// ════════════════════════════════════════════════
+//  BIM 3D 平面图渲染
+// ════════════════════════════════════════════════
+let renderer2=null,scene2=null,camera2=null,fp2Objs=[],fp2Lights=[];
+// BIM 相机球坐标（支持拖拽/缩放）
+let bimSph={theta:0.8,phi:0.58,r:22};
+let bimAutoRot=true,bimIsDrag=false,bimLastM={x:0,y:0};
+const BIM_TGT=new THREE.Vector3(0,1.2,0);
+
+function updateCamera2(){
+  if(!camera2)return;
+  camera2.position.set(
+    BIM_TGT.x+bimSph.r*Math.sin(bimSph.phi)*Math.sin(bimSph.theta),
+    BIM_TGT.y+bimSph.r*Math.cos(bimSph.phi),
+    BIM_TGT.z+bimSph.r*Math.sin(bimSph.phi)*Math.cos(bimSph.theta)
+  );
+  camera2.lookAt(BIM_TGT);
+}
+
+function initBIMRenderer(){
+  const cvs=document.getElementById('floor-plan-canvas');
+  renderer2=new THREE.WebGLRenderer({canvas:cvs,antialias:true});
+  renderer2.setPixelRatio(Math.min(window.devicePixelRatio,2));
+  renderer2.shadowMap.enabled=true;renderer2.shadowMap.type=THREE.PCFSoftShadowMap;
+  renderer2.setClearColor(0x070E1A,1);
+  scene2=new THREE.Scene();scene2.background=new THREE.Color(0x070E1A);
+  camera2=new THREE.PerspectiveCamera(36,1,0.1,200);
+  updateCamera2();
+  fp2Lights=[];
+  const amb2=new THREE.AmbientLight(0x4A6688,1.1);
+  scene2.add(amb2);fp2Lights.push(amb2);
+  const sun2=new THREE.DirectionalLight(0xFFFFFF,1.5);
+  sun2.castShadow=true;sun2.position.set(14,28,18);
+  sun2.shadow.mapSize.set(2048,2048);sun2.shadow.camera.near=1;sun2.shadow.camera.far=80;
+  sun2.shadow.camera.left=-22;sun2.shadow.camera.right=22;sun2.shadow.camera.top=18;sun2.shadow.camera.bottom=-18;sun2.shadow.bias=-0.002;
+  scene2.add(sun2);fp2Lights.push(sun2);
+  const fill2=new THREE.DirectionalLight(0x2233AA,0.4);fill2.position.set(-12,16,-10);
+  scene2.add(fill2);fp2Lights.push(fill2);
+  resizeBIMRenderer();
+}
+
+function resizeBIMRenderer(){
+  if(!renderer2||!camera2)return;
+  const wrap=document.getElementById('fv-canvas-wrap'),rect=wrap.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  renderer2.setSize(rect.width,rect.height,false);
+  const c=document.getElementById('floor-plan-canvas');c.style.width=rect.width+'px';c.style.height=rect.height+'px';
+  camera2.aspect=rect.width/rect.height;camera2.updateProjectionMatrix();
+}
+
+function b2box(w,h,d,col,op=1,cast=true,recv=true){
+  const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),
+    new THREE.MeshStandardMaterial({color:col,transparent:op<1,opacity:op,roughness:0.7,metalness:0.1}));
+  m.castShadow=cast;m.receiveShadow=recv;return m;
+}
+function fp2Add(o){scene2.add(o);fp2Objs.push(o);return o;}
+
+// 房间颜色（透明 BIM 风格）
+const BIM2_ROOM={
+  office:        {floor:0x1C3655,wall:0xB0C8DC,flOp:0.55},
+  meeting:       {floor:0x133822,wall:0xA0C8B0,flOp:0.55},
+  'meeting-large':{floor:0x0F2E1A,wall:0x90C0A0,flOp:0.6},
+  corridor:      {floor:0x0B1A2A,wall:0x90A8BC,flOp:0.4},
+  control:       {floor:0x241E0A,wall:0xD0A880,flOp:0.55},
+  danger:        {floor:0x370C0C,wall:0xD08080,flOp:0.65},
+  storage:       {floor:0x181A26,wall:0xA0A4B8,flOp:0.45},
+  utility:       {floor:0x0C2030,wall:0x90B4C8,flOp:0.45},
+  kitchen:       {floor:0x20200A,wall:0xC8C890,flOp:0.5},
+  parking:       {floor:0x0D1320,wall:0x8898A8,flOp:0.4},
+  lobby:         {floor:0x122540,wall:0xA0C0D8,flOp:0.55},
+};
+const WH=2.6,WT=0.2,OT=0.3,FH=0.1,SH=0.12;
+
+function drawFloorPlan(fid){
+  if(!renderer2)initBIMRenderer();
+  fp2Objs.forEach(o=>scene2.remove(o));fp2Objs=[];
+  const fl=FLOORS[fid],rooms=FLOOR_ROOMS[fid]||[];
+
+  // 楼板
+  const slab=b2box(BW+OT*2,SH,BD+OT*2,0x090E1A,0.9,false,true);
+  slab.position.y=-SH/2;fp2Add(slab);
+
+  // 外墙（半透明）
+  const owcol=0x9AB0C4,owop=0.55;
+  const y=WH/2,t=OT;
+  [[BW+t*2,WH,t,0,y,-BD/2-t/2],[BW+t*2,WH,t,0,y,BD/2+t/2],
+   [t,WH,BD,-BW/2-t/2,y,0],[t,WH,BD,BW/2+t/2,y,0]
+  ].forEach(([ww,wh,wd,px,py,pz])=>{
+    const m=b2box(ww,wh,wd,owcol,owop);m.position.set(px,py,pz);fp2Add(m);
+  });
+
+  // 房间
+  rooms.forEach(([xp,yp,wp,hp,label,type])=>{
+    const rx=(xp/100)*BW-BW/2,rz=(yp/100)*BD-BD/2;
+    const rw=(wp/100)*BW,rd=(hp/100)*BD,cx=rx+rw/2,cz=rz+rd/2;
+    const cfg=BIM2_ROOM[type]||BIM2_ROOM.office;
+
+    // 地板（透明色块）
+    const flr=b2box(rw-0.04,FH,rd-0.04,cfg.floor,cfg.flOp);
+    flr.position.set(cx,FH/2,cz);fp2Add(flr);
+
+    // 内墙（细，半透明）
+    const yw=WH/2,wc=cfg.wall,wo=0.45;
+    [[rw,WH,WT,cx,yw,cz-rd/2],[rw,WH,WT,cx,yw,cz+rd/2],
+     [WT,WH,rd,cx-rw/2,yw,cz],[WT,WH,rd,cx+rw/2,yw,cz]
+    ].forEach(([ww,wh,wd,px,py,pz])=>{
+      const m=b2box(ww,wh,wd,wc,wo);m.position.set(px,py,pz);fp2Add(m);
+    });
+
+    // 家具
+    addBIM2Furniture(type,cx,cz,rw,rd,fl.status);
+  });
+
+  // 图层叠加
+  if(layerState['L5'])addBIM2Routes(fid);
+  if(layerState['L4'])addBIM2Heat(fid,fl,rooms);
+  if(layerState['L3'])addBIM2Cams();
+  if(layerState['L6']&&smokeTime>0&&fid<=1)addBIM2Smoke();
+  if(layerState['L7'])addBIM2Danger(fid);
+  // 系统设备图标
+  ['LA','LB','LC','LD','LE','LF','LG'].forEach(lid=>{
+    if(layerState[lid])addBIM2Devices(lid,fid,fl);
+  });
+  if(layerState['LH'])addBIM2Patrol(fid);
+  if(layerState['LI'])addBIM2PatrolRoute(fid);
+
+  resizeBIMRenderer();
+}
+
+function addBIM2Furniture(type,cx,cz,rw,rd,status){
+  const DC=0x243A58,CC=0x192E48,TC=0x173045,RC=0x14202E;
+  const fx=p=>cx-rw/2+rw*p, fz=p=>cz-rd/2+rd*p;
+  if(type==='office'){
+    const cols=Math.max(2,Math.floor(rw/2.0)),rows=Math.min(3,Math.floor(rd/1.8));
+    for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+      const dx=fx(0.12+c*(0.75/Math.max(cols-1,1))),dz=fz(0.18+r*(0.62/Math.max(rows-1,1)));
+      const desk=b2box(0.95,0.07,0.48,DC,0.8);desk.position.set(dx,0.07,dz);fp2Add(desk);
+      const mon=b2box(0.4,0.16,0.03,0x0C1E38,0.7);mon.position.set(dx,0.18,dz-0.19);fp2Add(mon);
+      const ch=b2box(0.38,0.05,0.38,CC,0.75);ch.position.set(dx,0.05,dz+0.3);fp2Add(ch);
+    }
+  } else if(type==='meeting'||type==='meeting-large'){
+    const tw=rw*.62,td=rd*.48;
+    const tbl=b2box(tw,0.08,td,TC,0.8);tbl.position.set(cx,0.08,cz);fp2Add(tbl);
+    const nS=Math.max(2,Math.floor(tw/.82)),nE=Math.max(1,Math.floor(td/.82));
+    for(let i=0;i<nS;i++){const xo=-tw/2+tw*(i+.5)/nS;[-td/2-.38,td/2+.38].forEach(zo=>{const ch=b2box(.48,.05,.44,CC,.7);ch.position.set(cx+xo,.05,cz+zo);fp2Add(ch);});}
+    for(let i=0;i<nE;i++){const zo=-td/2+td*(i+.5)/nE;[-tw/2-.38,tw/2+.38].forEach(xo=>{const ch=b2box(.44,.05,.48,CC,.7);ch.position.set(cx+xo,.05,cz+zo);fp2Add(ch);});}
+  } else if(type==='control'){
+    const nr=Math.max(2,Math.floor(rw/1.0));
+    for(let i=0;i<nr;i++){
+      const rk=b2box(.55,1.8,.72,RC,.85);rk.position.set(fx(.14+i*(.72/Math.max(nr-1,1))),.9,fz(.25));fp2Add(rk);
+      const lt=b2box(.35,.04,.04,status==='alarm'?0xFF2200:0x00EE44,.9);lt.position.set(rk.position.x,.5,rk.position.z-.37);fp2Add(lt);
+    }
+  } else if(type==='parking'){
+    const nc=Math.max(2,Math.floor(rw*.75));
+    for(let i=0;i<nc;i++){
+      const car=b2box(2.0,.1,.9,0x18243A,.7);
+      car.position.set(fx(.05+(i%Math.ceil(nc/2))*(.88/Math.ceil(nc/2))),.05,fz(i<nc/2?.3:.7));fp2Add(car);
+    }
+  } else if(type==='kitchen'){
+    const c1=b2box(rw*.86,.8,.48,0x222005,.75);c1.position.set(cx,.4,fz(.87));fp2Add(c1);
+    const c2=b2box(.48,.8,rd*.62,0x222005,.75);c2.position.set(fx(.9),.4,cz);fp2Add(c2);
+  } else if(type==='lobby'){
+    const rcp=b2box(rw*.36,.86,rd*.13,0x1A3050,.75);rcp.position.set(cx,.43,fz(.28));fp2Add(rcp);
+  }
+}
+
+function addBIM2Routes(fid){
+  const routes=ESCAPE_ROUTES[fid]||[];
+  routes.forEach((pts,pi)=>{
+    const col=pi===0?0x4CAF50:0x2196F3;
+    const tpts=pts.map(p=>new THREE.Vector3((p.x/100)*BW-BW/2,0.15,(p.y/100)*BD-BD/2));
+    const tube=new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(tpts),30,.07,6),
+      new THREE.MeshStandardMaterial({color:col,emissive:new THREE.Color(col),emissiveIntensity:1.2,transparent:true,opacity:.88}));
+    fp2Add(tube);
+    // 出口标牌
+    const exit=b2box(.7,.4,.07,pi===0?0x1E7030:0x1E3070,.9);
+    const lp=tpts[tpts.length-1];exit.position.set(lp.x,.4,lp.z);fp2Add(exit);
+  });
+}
+
+function addBIM2Heat(fid,fl,rooms){
+  rooms.filter(r=>!['corridor','utility','parking'].includes(r[5])).forEach(([xp,yp,wp,hp])=>{
+    const rx=(xp/100)*BW-BW/2,rz=(yp/100)*BD-BD/2,rw=(wp/100)*BW,rd=(hp/100)*BD;
+    const d=fl.people/200,c=new THREE.Color();c.setHSL(.6-d*.52,.9,.45);
+    const pl=new THREE.Mesh(new THREE.PlaneGeometry(rw-.2,rd-.2),new THREE.MeshStandardMaterial({color:c,transparent:true,opacity:.3,depthWrite:false}));
+    pl.rotation.x=-Math.PI/2;pl.position.set(rx+rw/2,.14,rz+rd/2);fp2Add(pl);
+  });
+}
+
+function addBIM2Cams(){
+  const cmat=new THREE.MeshStandardMaterial({color:0x9C88FF,emissive:0x443388,emissiveIntensity:.7});
+  [[BW*.4,BD*.4],[BW*-.4,BD*.4],[0,BD*-.42],[BW*.4,BD*-.3],[BW*-.4,BD*-.3]].forEach(([px,pz])=>{
+    const c=new THREE.Mesh(new THREE.ConeGeometry(.15,.36,6),cmat);c.position.set(px,WH-.2,pz);c.rotation.x=-Math.PI/2;fp2Add(c);
+    const cone=new THREE.Mesh(new THREE.ConeGeometry(1.7,3,16,1,true),new THREE.MeshStandardMaterial({color:0x9C88FF,transparent:true,opacity:.07,side:THREE.DoubleSide,depthWrite:false}));
+    cone.position.set(px,WH*.65,pz+1.1);cone.rotation.x=Math.PI/2;fp2Add(cone);
+  });
+}
+
+function addBIM2Smoke(){
+  const op=Math.min(smokeTime/10*.6,.56);
+  const sm=b2box(BW*.8,WH*.45,BD*.8,0x3D2B1F,op,false,false);
+  sm.material.transparent=true;sm.position.set(0,WH*.55,0);fp2Add(sm);
+}
+
+function addBIM2Danger(fid){
+  if(fid!==0)return;
+  [[-5,0,-3],[3,0,4]].forEach(([px,,pz])=>{
+    const o=new THREE.Mesh(new THREE.OctahedronGeometry(.38),new THREE.MeshStandardMaterial({color:0xE24B4A,emissive:0xAA2020,emissiveIntensity:.9,transparent:true,opacity:.9}));
+    o.position.set(px,.38,pz);fp2Add(o);
+  });
+}
+
+function addBIM2Devices(lid,fid,fl){
+  const cfg=SYSTEM_CFG?.[lid]||{iconType:'LG',bg:'rgba(90,90,160,0.85)',size:0.7};
+  const count=Math.min(Math.floor(fl.devices/6)+1,6),seed=fid*100+lid.charCodeAt(1);
+  for(let i=0;i<count;i++){
+    const isA=(fl.status==='alarm'&&lid==='LB')||(fl.status==='warn'&&i<2&&lid==='LB');
+    const bg=isA?'rgba(200,20,20,0.95)':cfg.bg;
+    const sp=makeIconSprite(cfg.iconType,bg,cfg.size*0.85,{type:'device',lid,floor:fl.label,id:`${fl.label}-${lid}-${i}`,sysName:LAYERS.find(l=>l.id===lid)?.name||lid,status:isA?'alarm':'normal'});
+    sp.position.set(
+      (((seed+i*73)%89+5)/100)*BW-BW/2,WH-0.1,
+      (((seed+i*53)%85+5)/100)*BD-BD/2
+    );
+    fp2Add(sp);
+    if(isA){
+      const ring=new THREE.Mesh(new THREE.TorusGeometry(.24,.03,6,16),new THREE.MeshStandardMaterial({color:0xFF0000,emissive:0xFF2222,emissiveIntensity:1.2}));
+      ring.position.copy(sp.position);ring.rotation.x=Math.PI/2;fp2Add(ring);
+    }
+  }
+}
+
+function addBIM2Patrol(fid){
+  const fl=FLOORS[fid];const seed=fid*50;
+  for(let i=0;i<3;i++){
+    const sp=makeIconSprite('LH','rgba(40,190,190,0.9)',0.65,{type:'patrol',floor:fl.label,id:`PT-${fl.label}-${i+1}`});
+    sp.position.set(((seed+i*31)%70+15)/100*BW-BW/2,.2+i*.1,(((seed+11)+i*41)%70+15)/100*BD-BD/2);
+    fp2Add(sp);
+  }
+}
+
+function addBIM2PatrolRoute(fid){
+  const fl=FLOORS[fid];
+  const pts=[
+    new THREE.Vector3(-BW*.38,.14,-BD*.3),new THREE.Vector3(0,.14,-BD*.38),
+    new THREE.Vector3(BW*.38,.14,-BD*.3),new THREE.Vector3(BW*.38,.14,BD*.3),
+    new THREE.Vector3(0,.14,BD*.38),new THREE.Vector3(-BW*.38,.14,BD*.3),
+    new THREE.Vector3(-BW*.38,.14,-BD*.3),
+  ];
+  const geo=new THREE.BufferGeometry().setFromPoints(pts);
+  const mat=new THREE.LineDashedMaterial({color:0x40A0FF,dashSize:.4,gapSize:.2,transparent:true,opacity:.8,linewidth:2});
+  const line=new THREE.Line(geo,mat);line.computeLineDistances();fp2Add(line);
+}
+
+// ── BIM 场景设备图标使用顶部 SYSTEM_CFG ──
+
+// ════════════════════════════════════════════════
+//  悬停信息卡
+// ════════════════════════════════════════════════
+const hcard=document.getElementById('hcard');
+let hoverTm=null;
+
+// 屏幕空间精灵检测（比 3D raycast 更可靠）
+function findHoverTarget(mx,my){
+  const rect=canvas3d.getBoundingClientRect();
+  const cx=mx-rect.left, cy=my-rect.top;
+  let best=null, bestD=32; // px 阈值
+
+  // 检测所有可见精灵（屏幕空间距离）
+  allSprites.forEach(sp=>{
+    if(!sp.visible) return;
+    const v=sp.position.clone().project(camera);
+    if(v.z>1) return; // 在相机后面
+    const sx=(v.x+1)/2*rect.width;
+    const sy=(-v.y+1)/2*rect.height;
+    const d=Math.hypot(sx-cx,sy-cy);
+    if(d<bestD){bestD=d;best=sp;}
+  });
+
+  // 未命中精灵时，用 raycast 检测面片（楼层/路径/烟雾/危险品）
+  if(!best){
+    mouse2.x=(cx/rect.width)*2-1;
+    mouse2.y=-(cy/rect.height)*2+1;
+    raycaster.setFromCamera(mouse2,camera);
+    const meshObjs=[...floorMeshes.map(f=>f.wall),...routeMeshes,...smokeMeshes,...dangerMeshes];
+    const hits=raycaster.intersectObjects(meshObjs,false);
+    if(hits.length) best=hits[0].object;
+  }
+  return best;
+}
+
+canvas3d.addEventListener('mousemove',e=>{
+  if(cardLocked)return;
+  clearTimeout(hoverTm);
+  hoverTm=setTimeout(()=>{
+    const h=findHoverTarget(e.clientX,e.clientY);
+    h?.userData?.type?showCard(h,e.clientX,e.clientY):hideCard();
+  },120);
+});
+canvas3d.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();});
+canvas3d.addEventListener('click',e=>{
+  const h=findHoverTarget(e.clientX,e.clientY);
+  if(h?.userData?.type){
+    cardLocked=true;showCard(h,e.clientX,e.clientY);
+  } else {
+    forceHideCard();
+  }
+});
+
+// ── BIM 楼层详情画布 Hover（屏幕空间检测） ──
+const fvCanvas=document.getElementById('floor-plan-canvas');
+let fvHoverTm=null;
+
+function findFVHoverTarget(mx,my){
+  if(!camera2) return null;
+  const rect=fvCanvas.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0) return null;
+  const cx=mx-rect.left, cy=my-rect.top;
+  let best=null, bestD=30;
+  fp2Objs.forEach(obj=>{
+    if(!obj.userData?.type||obj.visible===false) return;
+    const v=obj.position.clone().project(camera2);
+    if(v.z>1) return;
+    const sx=(v.x+1)/2*rect.width;
+    const sy=(-v.y+1)/2*rect.height;
+    const d=Math.hypot(sx-cx,sy-cy);
+    if(d<bestD){bestD=d;best=obj;}
+  });
+  return best;
+}
+
+// BIM 画布拖拽旋转
+fvCanvas.addEventListener('mousedown',e=>{
+  if(e.button!==0)return;
+  bimIsDrag=true;bimAutoRot=false;bimLastM={x:e.clientX,y:e.clientY};
+  fvCanvas.style.cursor='grabbing';
+  e.preventDefault();
+});
+window.addEventListener('mouseup',()=>{if(bimIsDrag){bimIsDrag=false;fvCanvas.style.cursor='grab';}});
+window.addEventListener('mousemove',e=>{
+  if(!bimIsDrag)return;
+  const dx=e.clientX-bimLastM.x,dy=e.clientY-bimLastM.y;
+  bimLastM={x:e.clientX,y:e.clientY};
+  bimSph.theta-=dx*.009;
+  bimSph.phi=Math.max(.12,Math.min(1.45,bimSph.phi+dy*.009));
+  updateCamera2();
+});
+// BIM 画布滚轮缩放
+fvCanvas.addEventListener('wheel',e=>{
+  bimSph.r=Math.max(5,Math.min(50,bimSph.r+e.deltaY*.05));
+  bimAutoRot=false;updateCamera2();
+  e.preventDefault();
+},{passive:false});
+// BIM 双击复位
+fvCanvas.addEventListener('dblclick',e=>{
+  // 先检查是否点中了精灵，是则不复位
+  const h=findFVHoverTarget(e.clientX,e.clientY);
+  if(h?.userData?.type) return;
+  bimSph={theta:0.8,phi:0.58,r:22};bimAutoRot=true;updateCamera2();
+  showToast('视角已复位');
+});
+// BIM hover（拖拽中不触发）
+fvCanvas.addEventListener('mousemove',e=>{
+  if(bimIsDrag){if(!cardLocked)hideCard();return;}
+  if(cardLocked)return;
+  clearTimeout(fvHoverTm);
+  fvHoverTm=setTimeout(()=>{
+    const h=findFVHoverTarget(e.clientX,e.clientY);
+    h?.userData?.type?showCard(h,e.clientX,e.clientY):hideCard();
+  },150);
+});
+fvCanvas.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();bimIsDrag=false;});
+fvCanvas.addEventListener('click',e=>{
+  if(bimIsDrag)return;
+  const h=findFVHoverTarget(e.clientX,e.clientY);
+  if(h?.userData?.type){
+    cardLocked=true;showCard(h,e.clientX,e.clientY);
+  } else {
+    forceHideCard();
+  }
+});
+
+let cardLocked=false;
+
+function showCard(obj,mx,my){
+  const ud=obj.userData,type=ud.type;
+  let html='';
+  if(type==='floor')      html=cardFloor(ud);
+  else if(type==='device')html=cardDevice(ud);
+  else if(type==='route') html=cardRoute(ud);
+  else if(type==='camera')html=cardCamera(ud);
+  else if(type==='danger')html=cardDanger(ud);
+  else if(type==='patrol')html=cardPatrol(ud);
+  else return;
+  const lockBar='<div class="hc-lock-bar"><span>已锁定 · 点击空白处关闭</span><span class="hc-close-btn" onclick="forceHideCard()">×</span></div>';
+  hcard.innerHTML=(cardLocked?lockBar:'')+html;
+  hcard.classList.toggle('locked',cardLocked);
+  let cx=mx+14,cy=my-20;
+  if(cx+265>window.innerWidth-60)cx=mx-267;
+  if(cy+290>window.innerHeight-50)cy=my-290;
+  hcard.style.left=cx+'px';hcard.style.top=cy+'px';
+  hcard.classList.add('show');
+}
+function hideCard(){if(cardLocked)return;hcard.classList.remove('show','locked');}
+function forceHideCard(){cardLocked=false;hcard.classList.remove('show','locked');}
+
+// 卡片 hover 时不消失
+hcard.addEventListener('mouseenter',()=>clearTimeout(hoverTm));
+hcard.addEventListener('mouseleave',()=>{if(!cardLocked)hideCard();});
+
+function cardFloor(ud){
+  const fl=FLOORS[ud.floorId]||FLOORS[1],sc={normal:'#4CAF50',warn:'#FFC107',alarm:'#E24B4A'};
+  const c=sc[fl.status]||'#4CAF50';
+  return `<div class="hch"><div class="hch-dot" style="background:#4A90D9"></div><span class="hch-type">楼层 · 防火分区</span><span class="hch-badge" style="color:${c}">${fl.status==='alarm'?'⚠告警':fl.status==='warn'?'⚠警告':'✓正常'}</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${fl.label}</span></div><div class="hcr"><span class="hcl">当前人员</span><span class="hcv">${fl.people}人</span></div><div class="hcr"><span class="hcl">设备在线</span><span class="hcv" style="color:#4CAF50">${fl.devices}/${fl.devices}</span></div><div class="hcr"><span class="hcl">功能区</span><span class="hcv">${fl.theme.split('/')[0]}</span></div>${fl.alarmText?`<div class="hcdiv"></div><div class="hcr"><span class="hcl">告警</span><span class="hcv" style="color:#E24B4A">${fl.alarmText}</span></div>`:''}</div>
+  <div class="hcpa"><div class="hca" onclick="openFloorDetail(${fl.id});hideCard()">进入楼层详情</div><div class="hca" onclick="showToast('生成报告中')">生成报告</div></div>`;
+}
+function cardDevice(ud){
+  const c=ud.status==='alarm'?'#E24B4A':'#4CAF50';
+  return `<div class="hch"><div class="hch-dot" style="background:${c}"></div><span class="hch-type">${ud.sysName||ud.lid}</span><span class="hch-badge" style="color:${c}">${ud.status==='alarm'?'⚠告警':'✓正常'}</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">设备ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">安装日期</span><span class="hcv">2021-06-15</span></div>${ud.status==='alarm'?'<div class="hcwarn">⚠ 需立即响应 · 授权 L3</div>':''}</div>
+  <div class="hcpa"><div class="hca r" onclick="showToast('已派单维修')">派单维修</div><div class="hca" onclick="showToast('查看详情')">设备详情</div><div class="hca" onclick="showToast('已标记')">标记处理</div></div>`;
+}
+function cardRoute(ud){
+  return `<div class="hch"><div class="hch-dot" style="background:#4CAF50"></div><span class="hch-type">逃生路径</span><span class="hch-badge" style="color:#4CAF50">推荐路径</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">路径长度</span><span class="hcv">${ud.len||87}m</span></div><div class="hcr"><span class="hcl">预计用时</span><span class="hcv">约${Math.round((ud.len||87)/1.5)}秒</span></div><div class="hcr"><span class="hcl">全段传感器</span><span class="hcv" style="color:#4CAF50">正常</span></div></div>
+  <div class="hcpa"><div class="hca" onclick="showToast('广播引导中')">广播引导</div><div class="hca" onclick="showToast('路径已导出')">导出路径</div></div>`;
+}
+function cardCamera(ud){
+  return `<div class="hch"><div class="hch-dot" style="background:#9C88FF"></div><span class="hch-type">视频监控</span><span class="hch-badge" style="color:#4CAF50">● 在线</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">摄像头ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">分辨率</span><span class="hcv">4K / 夜视开</span></div><div class="hcdiv"></div><div style="height:60px;background:rgba(74,144,217,.08);border:1px solid rgba(74,144,217,.2);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:9.5px;color:rgba(232,244,255,.3)">实时画面缩略图</div></div>
+  <div class="hcpa"><div class="hca" onclick="showToast('全屏查看')">全屏查看</div><div class="hca" onclick="showToast('AI分析中…')">AI分析</div><div class="hca" onclick="showToast('历史录像')">历史录像</div></div>`;
+}
+function cardDanger(ud){
+  return `<div class="hch"><div class="hch-dot" style="background:#FF6B35"></div><span class="hch-type">危险品存放区</span><span class="hch-badge" style="color:#E24B4A">⚠高风险</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">类型</span><span class="hcv" style="color:#FF6B35">${ud.label}</span></div><div class="hcr"><span class="hcl">存放物</span><span class="hcv">${ud.dtype}</span></div><div class="hcr"><span class="hcl">责任人</span><span class="hcv">王明·138****5678</span></div>${smokeTime>=3&&layerState['L6']?'<div class="hcwarn">⚠ 烟气推演：即将到达！</div>':''}</div>
+  <div class="hcpa"><div class="hca r" onclick="showToast('紧急通知已发送！')">紧急通知</div><div class="hca" onclick="showToast('查看台账')">查看台账</div></div>`;
+}
+function cardPatrol(ud){
+  return `<div class="hch"><div class="hch-dot" style="background:#80FFFF"></div><span class="hch-type">巡检点</span><span class="hch-badge" style="color:#80FFFF">📍</span></div>
+  <div class="hcb"><div class="hcr"><span class="hcl">巡检点ID</span><span class="hcv">${ud.id}</span></div><div class="hcr"><span class="hcl">楼层</span><span class="hcv">${ud.floor}</span></div><div class="hcr"><span class="hcl">上次巡检</span><span class="hcv" style="color:#4CAF50">今天 09:22 ✓</span></div><div class="hcr"><span class="hcl">下次计划</span><span class="hcv">明天 09:00</span></div></div>
+  <div class="hcpa"><div class="hca" onclick="showToast('开始巡检')">开始巡检</div><div class="hca" onclick="showToast('查看记录')">历史记录</div></div>`;
+}
+
+// ════════════════════════════════════════════════
+//  浮动面板
+// ════════════════════════════════════════════════
+function togglePanel(name){
+  const isOpen=openPanel===name;closePanels();
+  if(!isOpen){
+    document.getElementById('panel-'+name).classList.add('open');
+    document.getElementById('fb-'+name).classList.add('active');
+    document.getElementById('panel-overlay').classList.add('show');
+    openPanel=name;
+    if(name==='layer')buildLayerList();
+    if(name==='floor')buildFloorList();
+  }
+}
+function closePanels(){
+  document.querySelectorAll('.fpanel').forEach(p=>p.classList.remove('open'));
+  document.querySelectorAll('.fb').forEach(b=>b.classList.remove('active'));
+  document.getElementById('panel-overlay').classList.remove('show');
+  openPanel=null;
+}
+
+// ════════════════════════════════════════════════
+//  Toast & Clock
+// ════════════════════════════════════════════════
+let toastTm=null;
+function showToast(msg){
+  const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');
+  clearTimeout(toastTm);toastTm=setTimeout(()=>el.classList.remove('show'),2400);
+}
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('zh-CN',{hour12:false});},1000);
+
+// ════════════════════════════════════════════════
+//  Resize & Render Loop
+// ════════════════════════════════════════════════
+function resizeRenderer(){
+  const rect=mainView.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  renderer.setSize(rect.width,rect.height,false);
+  canvas3d.style.width=rect.width+'px';canvas3d.style.height=rect.height+'px';
+  camera.aspect=rect.width/rect.height;camera.updateProjectionMatrix();
+}
+function resizeBIMRenderer(){
+  if(!renderer2||!camera2)return;
+  const wrap=document.getElementById('fv-canvas-wrap'),rect=wrap.getBoundingClientRect();
+  if(rect.width<=0||rect.height<=0)return;
+  renderer2.setSize(rect.width,rect.height,false);
+  const c=document.getElementById('floor-plan-canvas');c.style.width=rect.width+'px';c.style.height=rect.height+'px';
+  camera2.aspect=rect.width/rect.height;camera2.updateProjectionMatrix();
+}
+requestAnimationFrame(resizeRenderer);
+window.addEventListener('resize',()=>{resizeRenderer();resizeBIMRenderer();});
+
+let lastT=0,fCnt=0;
+function tick(now=0){
+  requestAnimationFrame(tick);
+  const dt=now-lastT;lastT=now;fCnt++;
+  if(fCnt%60===0)document.getElementById('bc-alarm'); // keep alive
+  pulse+=0.05;
+
+  // 主场景动效
+  allSprites.forEach(s=>{
+    if(s.userData?.status==='alarm'){
+      if(s.material?.map)s.material.opacity=0.7+Math.abs(Math.sin(pulse*3))*0.3;
+      if(s.scale)s.scale.setScalar(1+Math.abs(Math.sin(pulse*3))*0.18);
+    }
+  });
+  routeMats.forEach((m,i)=>{if(m.opacity>0)m.emissiveIntensity=0.9+Math.sin(pulse*2-i)*0.5;});
+  dangerMeshes.forEach(d=>{if(dangerMats[dangerMeshes.indexOf(d)]?.opacity>0)d.rotation.y+=0.025;});
+  if(!isDrag&&currentView==='standard'&&selectedFloor<0){sph.theta+=0.0003;updateCamera();}
+  renderer.render(scene,camera);
+
+  // BIM 楼层场景
+  if(renderer2&&scene2&&camera2&&document.getElementById('floor-view').classList.contains('show')){
+    if(bimAutoRot&&!bimIsDrag){
+      bimSph.theta+=0.0006;
+      updateCamera2();
+    }
+    // 告警脉冲
+    fp2Objs.forEach(o=>{
+      if(o.material?.emissive&&o.userData?.status==='alarm'){o.material.emissiveIntensity=0.8+Math.abs(Math.sin(pulse*3))*0.9;}
+    });
+    renderer2.render(scene2,camera2);
+  }
+}
+
+// ════════════════════════════════════════════════
+//  Init
+// ════════════════════════════════════════════════
+applyLayers();
+tick();
+setTimeout(()=>showToast('双击楼层 → 进入楼层详情页 · 右侧按钮列切换场景/图层'),900);
+</script>
+
+<!-- ════════════════════════════════════════════════
+     巡航模式 · 一期信息窗 + 弹窗
+     ════════════════════════════════════════════════ -->
+<style>
+/* ── 信息窗通用样式 ── */
+.info-panel {
+  position: fixed;
+  top: 56px;
+  z-index: 100;
+  background: rgba(8, 16, 32, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0, 212, 255, 0.15);
+  border-radius: 8px;
+  color: #e8f4ff;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+.info-panel::-webkit-scrollbar { width: 3px; }
+.info-panel::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 2px; }
+
+.info-panel-left {
+  left: 12px;
+  width: 300px;
+  bottom: 52px;
+}
+
+.info-panel-right {
+  right: 60px;
+  width: 150px;
+  bottom: 52px;
+  background: transparent;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+}
+
+/* ── 报警迷你卡片 ── */
+.alarm-card-mini {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  padding: 12px 10px;
+  margin-bottom: 8px;
+  transition: border-color 0.2s;
+  background: transparent;
+}
+.alarm-card-mini:hover {
+  border-color: rgba(255,255,255,0.2);
+}
+.alarm-card-mini:last-child { margin-bottom: 0; }
+.alarm-card-fire { border-left: 3px solid #FF3B30; }
+.alarm-card-warn { border-left: 3px solid #FF9800; }
+.alarm-card-fault { border-left: 3px solid #FFC107; }
+.alarm-card-info { border-left: 3px solid #4A90D9; }
+
+.alarm-card-mini-header {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.alarm-card-mini-header-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.alarm-card-mini-header-bottom {
+  font-size: 10px;
+  color: rgba(255,255,255,0.5);
+  padding-left: 12px;
+}
+.alarm-dot-fire { width:6px;height:6px;border-radius:50%;background:#FF3B30;box-shadow:0 0 6px #FF3B30;flex-shrink:0; }
+.alarm-dot-warn { width:6px;height:6px;border-radius:50%;background:#FF9800;box-shadow:0 0 6px #FF9800;flex-shrink:0; }
+.alarm-dot-fault { width:6px;height:6px;border-radius:50%;background:#FFC107;flex-shrink:0; }
+.alarm-dot-info { width:6px;height:6px;border-radius:50%;background:#4A90D9;flex-shrink:0; }
+
+.alarm-card-mini-type {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.8);
+  flex-shrink: 0;
+}
+.alarm-card-mini-time {
+  font-size: 10px;
+  color: rgba(255,255,255,0.3);
+  margin-left: auto;
+}
+
+.ip-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #00D4FF;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid rgba(0,212,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ip-title .ip-tag {
+  font-size: 9px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: rgba(0,212,255,0.12);
+  color: rgba(0,212,255,0.7);
+}
+
+.ip-body { padding: 10px 14px; }
+
+/* ── 实时总览 · 总-分指标行 ── */
+.overview-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+}
+.overview-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overview-label {
+  font-size: 10px;
+  color: rgba(232,244,255,0.45);
+}
+.overview-val {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+}
+.overview-sub {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 10px;
+  color: rgba(232,244,255,0.5);
+}
+.overview-trend {
+  font-size: 9px;
+}
+.overview-trend.up { color: #4CAF50; }
+.overview-trend.down { color: #FF3B30; }
+
+/* ── 弹窗内 · 筛选栏 ── */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+}
+.filter-group { display:flex; flex-direction:column; gap:3px; }
+.filter-group label { font-size:10px; color:rgba(255,255,255,.4); }
+.filter-select, .filter-input {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 4px;
+  color: #e8f4ff;
+  font-size: 11px;
+  padding: 5px 8px;
+  outline: none;
+}
+.filter-select:focus, .filter-input:focus { border-color: rgba(0,212,255,0.4); }
+.filter-input { width: 120px; }
+
+/* ── 弹窗内 · 数据表格 ── */
+.data-table-wrap { overflow-x: auto; }
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+.data-table th {
+  text-align: left;
+  padding: 8px 10px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.5);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  white-space: nowrap;
+}
+.data-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  color: rgba(255,255,255,0.7);
+}
+.data-table-sm td, .data-table-sm th { padding: 5px 8px; font-size:10px; }
+.td-actions { white-space: nowrap; }
+
+/* ── 状态标签 ── */
+.tag-fire { background:rgba(255,59,48,0.15); color:#FF3B30; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.tag-warn { background:rgba(255,152,0,0.15); color:#FF9800; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.tag-fault { background:rgba(255,193,7,0.15); color:#FFC107; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.tag-info { background:rgba(74,144,217,0.15); color:#4A90D9; padding:2px 8px; border-radius:3px; font-size:10px; font-weight:600; }
+.tag-done { background:rgba(76,175,80,0.12); color:#4CAF50; padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-pending { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.4); padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-progress { background:rgba(0,212,255,0.12); color:#00D4FF; padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-overdue { background:rgba(255,59,48,0.12); color:#FF3B30; padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-online { background:rgba(76,175,80,0.12); color:#4CAF50; padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-offline { background:rgba(255,255,255,0.06); color:rgba(255,255,255,0.35); padding:2px 8px; border-radius:3px; font-size:10px; }
+.tag-abnormal { background:rgba(255,59,48,0.12); color:#FF3B30; padding:2px 8px; border-radius:3px; font-size:10px; }
+
+/* ── 小按钮 ── */
+.btn-sm {
+  padding: 3px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,212,255,0.25);
+  background: transparent;
+  color: #00D4FF;
+  font-size: 10px;
+  cursor: pointer;
+  margin-right: 4px;
+}
+.btn-sm:hover { background: rgba(0,212,255,0.08); }
+.btn-sm-warn { border-color: rgba(255,152,0,0.3); color: #FF9800; }
+.btn-sm-warn:hover { background: rgba(255,152,0,0.08); }
+.btn-sm-danger { border-color: rgba(255,59,48,0.3); color: #FF3B30; }
+.btn-sm-danger:hover { background: rgba(255,59,48,0.08); }
+.btn-link { background:none; border:none; color:#00D4FF; font-size:10px; cursor:pointer; padding:0; text-decoration:underline; }
+
+/* ── 进度条 ── */
+.progress-bar {
+  display: inline-block;
+  width: 80px;
+  height: 6px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+  vertical-align: middle;
+}
+.progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.progress-text { font-size: 10px; color: rgba(255,255,255,0.5); margin-left: 6px; }
+
+/* ── 表单样式 ── */
+.form-group { margin-bottom: 14px; }
+.form-label { display: block; font-size: 11px; color: rgba(255,255,255,0.6); margin-bottom: 5px; }
+.form-required { color: #FF3B30; }
+.form-select, .form-textarea {
+  width: 100%;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  color: #e8f4ff;
+  font-size: 12px;
+  padding: 8px 10px;
+  outline: none;
+  box-sizing: border-box;
+}
+.form-select:focus, .form-textarea:focus { border-color: rgba(0,212,255,0.4); }
+.form-textarea { height: 60px; resize: vertical; font-family: inherit; }
+.form-radio-group { display: flex; gap: 16px; }
+.form-radio { display: flex; align-items: center; gap: 5px; font-size: 12px; color: rgba(255,255,255,0.7); cursor: pointer; }
+.form-radio input[type="radio"] { accent-color: #00D4FF; }
+
+/* ── 派单弹窗 · 告警信息摘要 ── */
+.dispatch-alarm-info, .dispatch-header-info {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+.dispatch-info-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 11px;
+}
+.dispatch-info-row .lbl { color: rgba(255,255,255,0.4); }
+.dispatch-info-row .val { color: rgba(255,255,255,0.8); }
+
+/* ── 调度弹窗 · 人员列表 ── */
+.dispatch-person-list { display: flex; flex-direction: column; gap: 6px; }
+.dispatch-person-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+}
+.dispatch-person-name { font-size: 12px; color: rgba(255,255,255,0.8); }
+.dispatch-person-role { font-size: 10px; color: rgba(255,255,255,0.4); flex: 1; }
+.dispatch-person-status { font-size: 10px; color: #4CAF50; }
+
+/* ── 巡检详情 · 信息网格 ── */
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  margin-bottom: 12px;
+}
+.detail-item .lbl { font-size: 10px; color: rgba(255,255,255,0.35); display: block; margin-bottom: 2px; }
+.detail-item .val { font-size: 12px; color: rgba(255,255,255,0.8); }
+
+/* ── 巡检详情 · 巡查点列表 ── */
+.inspect-points-title { font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.6); margin-bottom: 8px; }
+.inspect-point-item {
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 6px;
+  margin-bottom: 6px;
+  overflow: hidden;
+}
+.inspect-point-item.active { border-color: rgba(0,212,255,0.3); }
+.inspect-point-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.inspect-point-header:hover { background: rgba(255,255,255,0.03); }
+.inspect-point-name { font-size: 12px; color: rgba(255,255,255,0.7); }
+.inspect-point-detail {
+  display: none;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,0.04);
+  background: rgba(255,255,255,0.02);
+}
+.inspect-point-item.active .inspect-point-detail { display: block; }
+
+/* ── 值班人员操作按钮组 ── */
+.duty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.duty-btn {
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,212,255,0.2);
+  background: rgba(0,212,255,0.05);
+  color: #00D4FF;
+  font-size: 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.duty-btn:hover { background: rgba(0,212,255,0.12); }
+.duty-call { font-size: 12px; }
+
+/* ── 模态弹窗 ── */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.modal-overlay.active { display: flex; }
+
+.modal-box {
+  background: rgba(12, 20, 40, 0.95);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 12px;
+  color: #e8f4ff;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+  min-width: 480px;
+  max-width: 640px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 0 40px rgba(0,212,255,0.1), 0 20px 60px rgba(0,0,0,0.5);
+}
+.modal-box::-webkit-scrollbar { width: 3px; }
+.modal-box::-webkit-scrollbar-thumb { background: rgba(0,212,255,0.3); border-radius: 2px; }
+
+.modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid rgba(0,212,255,0.1);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.modal-header h3 {
+  font-size: 15px;
+  font-weight: 600;
+  color: #fff;
+  margin: 0;
+}
+.modal-close {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: rgba(255,255,255,0.5);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+.modal-content { padding: 16px 20px; }
+.modal-footer {
+  padding: 12px 20px;
+  border-top: 1px solid rgba(0,212,255,0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.btn-primary {
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #00D4FF;
+  color: #040818;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-primary:hover { background: #33DDFF; }
+.btn-secondary {
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(0,212,255,0.3);
+  background: transparent;
+  color: #00D4FF;
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn-secondary:hover { background: rgba(0,212,255,0.08); }
+.btn-danger {
+  padding: 7px 16px;
+  border-radius: 6px;
+  border: none;
+  background: #FF3B30;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.btn-danger:hover { background: #FF5A4F; }
+
+/* ── 巡航模式卡片样式 ── */
+.ip-card {
+  background: rgba(0, 20, 40, 0.6);
+  border: 1px solid rgba(0, 212, 255, 0.08);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+.ip-card-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e8f4ff;
+  padding: 10px 12px 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.ip-card-title .card-icon { font-size: 14px; }
+.ip-card-body { padding: 4px 12px 10px; }
+
+/* KPI 卡片网格 */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.kpi-item {
+  background: rgba(0,212,255,.04);
+  border: 1px solid rgba(0,212,255,.08);
+  border-radius: 5px;
+  padding: 8px;
+  text-align: center;
+}
+.kpi-val { font-size: 18px; font-weight: 700; color: #00D4FF; }
+.kpi-lbl { font-size: 9px; color: rgba(232,244,255,.4); margin-top: 2px; }
+
+/* 类型分布条形图 */
+.dist-bar-wrap { margin-top: 4px; }
+.dist-row {
+  display: flex;
+  align-items: center;
+  font-size: 10px;
+  margin-bottom: 4px;
+}
+.dist-label { width: 36px; color: rgba(232,244,255,.6); flex-shrink: 0; }
+.dist-bar-bg { flex: 1; height: 6px; background: rgba(255,255,255,.06); border-radius: 3px; margin: 0 8px; }
+.dist-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+.dist-pct { width: 30px; text-align: right; color: rgba(232,244,255,.5); }
+
+/* 值班卡片 */
+.duty-person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0,212,255,0.06);
+}
+.duty-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(0,212,255,.12);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+.duty-info { flex: 1; }
+.duty-name { font-size: 12px; font-weight: 600; color: #e8f4ff; }
+.duty-role { font-size: 10px; color: rgba(232,244,255,.4); }
+.duty-shift { font-size: 10px; color: rgba(0,212,255,.6); margin-top: 2px; }
+.duty-call {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,212,255,.3);
+  background: transparent;
+  color: #00D4FF;
+  font-size: 10px;
+  cursor: pointer;
+}
+.duty-call:hover { background: rgba(0,212,255,.1); }
+
+/* 巡检任务列表 */
+.task-stats {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 10px;
+}
+.task-stat { display: flex; align-items: center; gap: 3px; }
+.task-dot { width: 6px; height: 6px; border-radius: 50%; }
+.task-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 11px;
+  border-bottom: 1px solid rgba(0,212,255,0.04);
+}
+.task-row:last-child { border-bottom: none; }
+.task-info { flex: 1; }
+.task-name { color: rgba(232,244,255,.8); }
+.task-time { font-size: 9px; color: rgba(232,244,255,.35); }
+.task-level {
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 3px;
+  margin-right: 8px;
+  font-weight: 600;
+}
+.level-fire { background: rgba(255,59,48,.15); color: #FF3B30; }
+.level-warn { background: rgba(255,152,0,.12); color: #FF9800; }
+.level-fault { background: rgba(255,193,7,.1); color: #FFC107; }
+.level-info { background: rgba(0,212,255,.1); color: #00D4FF; }
+.task-handle {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,212,255,.25);
+  background: transparent;
+  color: #00D4FF;
+  font-size: 10px;
+  cursor: pointer;
+}
+.task-handle:hover { background: rgba(0,212,255,.1); }
+.task-handle.done { color: #4CAF50; border-color: #4CAF50; cursor: default; }
+.task-issue {
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* 告警详情弹窗 */
+.alarm-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.alarm-level-tag {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.alarm-level-fire { background: rgba(255,59,48,.18); color: #FF3B30; }
+.alarm-level-warn { background: rgba(255,152,0,.14); color: #FF9800; }
+.alarm-level-fault { background: rgba(255,193,7,.12); color: #FFC107; }
+.alarm-level-info { background: rgba(0,212,255,.12); color: #00D4FF; }
+.alarm-info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.alarm-info-item {
+  background: rgba(0,20,40,.5);
+  border-radius: 4px;
+  padding: 8px 10px;
+}
+.alarm-info-item .lbl { font-size: 10px; color: rgba(232,244,255,.4); }
+.alarm-info-item .val { font-size: 12px; color: #e8f4ff; margin-top: 2px; font-weight: 500; }
+.alarm-desc {
+  font-size: 11px;
+  color: rgba(232,244,255,.6);
+  line-height: 1.6;
+  padding: 10px;
+  background: rgba(0,20,40,.4);
+  border-radius: 4px;
+  margin-bottom: 12px;
+}
+
+/* 面板折叠按钮 */
+.panel-toggle {
+  position: absolute;
+  top: 50%;
+  right: -20px;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 48px;
+  background: rgba(8,16,32,.9);
+  border: 1px solid rgba(0,212,255,.15);
+  border-left: none;
+  border-radius: 0 6px 6px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(0,212,255,.6);
+  font-size: 10px;
+  z-index: 101;
+}
+.panel-toggle:hover { background: rgba(0,212,255,.1); color: #00D4FF; }
+
+.info-panel-left.collapsed {
+  transform: translateX(-332px);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* 鹰眼视图提升层级，避免被信息面板遮挡 */
+#eagle-eye { z-index: 270 !important; }
+
+.info-panel-right.collapsed {
+  transform: translateX(292px);
+  opacity: 0;
+  pointer-events: none;
+}
+</style>
+
+<!-- ══ 巡航模式 · 左侧信息窗（一期：实时总览 + 值班排班 + 巡检任务） ══ -->
+<div class="info-panel info-panel-left" id="cruisePanel">
+  <div class="panel-toggle" onclick="toggleCruisePanel()">◀</div>
+
+  <!-- 实时总览 -->
+  <div class="ip-card">
+    <div class="ip-card-title">
+      <span class="card-icon">📊</span> 实时总览
+      <span class="ip-tag" style="margin-left:auto">实时</span>
+    </div>
+    <div class="ip-card-body">
+      <!-- 1.1 事件处置率 -->
+      <div class="overview-row" style="cursor:pointer" onclick="openModal('modal-event-list')">
+        <div class="overview-main">
+          <span class="overview-label">事件处置率</span>
+          <span class="overview-val" style="color:#4CAF50">96.2%</span>
+        </div>
+        <div class="overview-sub">
+          <span>已处置 <b style="color:#4CAF50">51</b> / 异常 <b style="color:#FF3B30">53</b></span>
+          <span class="overview-trend up">↑ 较昨日 +2.1%</span>
+        </div>
+      </div>
+      <!-- 1.2 巡检完成率 -->
+      <div class="overview-row" style="cursor:pointer" onclick="openModal('modal-inspect-list')">
+        <div class="overview-main">
+          <span class="overview-label">巡检完成率</span>
+          <span class="overview-val" style="color:#00D4FF">87%</span>
+        </div>
+        <div class="overview-sub">
+          <span>今日 <b style="color:#00D4FF">13</b> / 计划 <b>15</b></span>
+        </div>
+      </div>
+      <!-- 1.3 在线率 -->
+      <div class="overview-row" style="border-bottom:none;cursor:pointer" onclick="openModal('modal-device-list')">
+        <div class="overview-main">
+          <span class="overview-label">在线率</span>
+          <span class="overview-val" style="color:#4CAF50">98.8%</span>
+        </div>
+        <div class="overview-sub">
+          <span>在线 <b style="color:#4CAF50">247</b> / 总数 <b>250</b></span>
+          <span class="overview-trend down">↓ 较昨日 -0.4%</span>
+        </div>
+      </div>
+      <div style="font-size:9px;color:rgba(232,244,255,.25);margin-top:6px;text-align:center">一期版本 · 数据来源于设备管理模块</div>
+    </div>
+  </div>
+
+  <!-- 值班&排班 -->
+  <div class="ip-card">
+    <div class="ip-card-title">
+      <span class="card-icon">👤</span> 值班 & 排班
+    </div>
+    <div class="ip-card-body">
+      <div class="duty-person">
+        <div class="duty-avatar">👨‍🚒</div>
+        <div class="duty-info">
+          <div class="duty-name">张明远</div>
+          <div class="duty-role">消防值班长</div>
+          <div class="duty-shift">班次：08:00 - 20:00</div>
+        </div>
+        <div class="duty-actions">
+          <button class="duty-btn" onclick="openModal('modal-dispatch')">📋 派单</button>
+          <button class="duty-btn" onclick="openModal('modal-emergency-dispatch')">📡 调度</button>
+          <button class="duty-call" onclick="showToast('正在呼叫张明远...')">📞</button>
+        </div>
+      </div>
+      <div class="duty-person" style="border-bottom:none">
+        <div class="duty-avatar">👷</div>
+        <div class="duty-info">
+          <div class="duty-name">李建国</div>
+          <div class="duty-role">物业消防专管</div>
+          <div class="duty-shift">班次：20:00 - 次日08:00 · 全天候</div>
+        </div>
+        <div class="duty-actions">
+          <button class="duty-btn" onclick="openModal('modal-dispatch')">📋 派单</button>
+          <button class="duty-btn" onclick="openModal('modal-emergency-dispatch')">📡 调度</button>
+          <button class="duty-call" onclick="showToast('正在呼叫李建国...')">📞</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 巡检任务 -->
+  <div class="ip-card">
+    <div class="ip-card-title">
+      <span class="card-icon">📋</span> 巡检任务
+    </div>
+    <div class="ip-card-body">
+      <div class="task-stats">
+        <div class="task-stat"><div class="task-dot" style="background:#FF3B30"></div><span style="color:rgba(232,244,255,.5)">已延期 1</span></div>
+        <div class="task-stat"><div class="task-dot" style="background:#FF9800"></div><span style="color:rgba(232,244,255,.5)">待巡检 3</span></div>
+        <div class="task-stat"><div class="task-dot" style="background:#4CAF50"></div><span style="color:rgba(232,244,255,.5)">已完成 2</span></div>
+        <div class="task-stat"><div class="task-dot" style="background:#00D4FF"></div><span style="color:rgba(232,244,255,.5)">进行中 2</span></div>
+      </div>
+      <div class="task-row" style="cursor:pointer" onclick="openModal('modal-inspect-detail')">
+        <div class="task-info">
+          <div class="task-name">B1层巡检-0505</div>
+          <div class="task-time">15:42:01 · 责任人：王磊</div>
+        </div>
+        <span class="task-issue" style="color:#FF3B30">2项问题</span>
+      </div>
+      <div class="task-row" style="cursor:pointer" onclick="openModal('modal-inspect-detail')">
+        <div class="task-info">
+          <div class="task-name">3F层巡检-0505</div>
+          <div class="task-time">14:18:41 · 责任人：张明远</div>
+        </div>
+        <span class="task-issue" style="color:#FF3B30">1项问题</span>
+      </div>
+      <div class="task-row" style="cursor:pointer" onclick="openModal('modal-inspect-detail')">
+        <div class="task-info">
+          <div class="task-name">4F层巡检-0505</div>
+          <div class="task-time">13:55:22 · 责任人：李建国</div>
+        </div>
+        <span class="task-issue" style="color:#4CAF50">正常</span>
+      </div>
+      <div class="task-row" style="cursor:pointer" onclick="openModal('modal-inspect-detail')">
+        <div class="task-info">
+          <div class="task-name">2F层巡检-0505</div>
+          <div class="task-time">13:20:08 · 责任人：赵敏</div>
+        </div>
+        <span class="task-issue" style="color:rgba(232,244,255,.35)">待巡查</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 巡航模式 · 右侧信息窗（一期：设备监测报警列表） ══ -->
+<div class="info-panel info-panel-right" id="cruisePanelRight">
+  <div class="panel-toggle" onclick="toggleCruisePanelRight()" style="left:auto;right:0;top:6px;">▶</div>
+
+  <!-- 设备监测报警卡片列表（无标题，平铺，精简版） -->
+  <div style="padding:8px 10px 10px;background:transparent">
+    <div class="alarm-card-mini alarm-card-fire" onclick="location.href='alarm.html'" style="cursor:pointer">
+      <div class="alarm-card-mini-header">
+        <div class="alarm-card-mini-header-top">
+          <span class="alarm-dot-fire"></span>
+          <span class="alarm-card-mini-type">火警</span>
+          <span class="alarm-card-mini-time">15:42</span>
+        </div>
+        <div class="alarm-card-mini-header-bottom">B1层 · 设备机房</div>
+      </div>
+    </div>
+    <div class="alarm-card-mini alarm-card-warn" onclick="location.href='alarm.html'" style="cursor:pointer">
+      <div class="alarm-card-mini-header">
+        <div class="alarm-card-mini-header-top">
+          <span class="alarm-dot-warn"></span>
+          <span class="alarm-card-mini-type">预警</span>
+          <span class="alarm-card-mini-time">14:18</span>
+        </div>
+        <div class="alarm-card-mini-header-bottom">4F层 · 茶水间</div>
+      </div>
+    </div>
+    <div class="alarm-card-mini alarm-card-fault" onclick="location.href='alarm.html'" style="cursor:pointer">
+      <div class="alarm-card-mini-header">
+        <div class="alarm-card-mini-header-top">
+          <span class="alarm-dot-fault"></span>
+          <span class="alarm-card-mini-type">故障</span>
+          <span class="alarm-card-mini-time">13:55</span>
+        </div>
+        <div class="alarm-card-mini-header-bottom">3F层 · 东北区</div>
+      </div>
+    </div>
+    <div class="alarm-card-mini alarm-card-info" onclick="location.href='alarm.html'" style="cursor:pointer">
+      <div class="alarm-card-mini-header">
+        <div class="alarm-card-mini-header-top">
+          <span class="alarm-dot-info"></span>
+          <span class="alarm-card-mini-type">信息</span>
+          <span class="alarm-card-mini-time">13:20</span>
+        </div>
+        <div class="alarm-card-mini-header-bottom">2F层 · 通道</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 弹窗：设备告警详情（一期保留） ══ -->
+<div class="modal-overlay" id="modal-alarm-detail" onclick="if(event.target===this)closeModal('modal-alarm-detail')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3>设备告警详情</h3>
+      <button class="modal-close" onclick="closeModal('modal-alarm-detail')">✕</button>
+    </div>
+    <div class="modal-content">
+      <div class="alarm-detail-header">
+        <span class="alarm-level-tag alarm-level-fire">火警</span>
+        <span style="font-size:13px;font-weight:600;color:#FF3B30">B1层 · 手动报警按钮触发</span>
+      </div>
+      <div class="alarm-info-grid">
+        <div class="alarm-info-item">
+          <div class="lbl">设备ID</div>
+          <div class="val">MCP-B1-003</div>
+        </div>
+        <div class="alarm-info-item">
+          <div class="lbl">设备位置</div>
+          <div class="val">B1层 · 设备机房</div>
+        </div>
+        <div class="alarm-info-item">
+          <div class="lbl">设备类型</div>
+          <div class="val">手动报警按钮</div>
+        </div>
+        <div class="alarm-info-item">
+          <div class="lbl">触发时间</div>
+          <div class="val">2026-05-05 15:42:01</div>
+        </div>
+      </div>
+      <div class="alarm-desc">
+        B1层设备机房手动报警按钮 MCP-B1-003 于 15:42:01 触发，系统已自动联动排烟风机与喷淋系统。当前该区域人员12人，需立即确认火情并启动应急疏散预案。
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-secondary" onclick="showToast('已转工单');closeModal('modal-alarm-detail')">转工单</button>
+      <button class="btn-danger" onclick="showToast('告警已消除');closeModal('modal-alarm-detail')">消除告警</button>
+      <button class="btn-primary" onclick="showToast('已指派张明远处理');closeModal('modal-alarm-detail')">指派处理</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  巡航模式 · 一期交互逻辑
+// ════════════════════════════════════════════════
+
+/* 打开/关闭弹窗 */
+function openModal(id) {
+  document.getElementById(id).classList.add('active');
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+/* 左侧面板折叠/展开 */
+function toggleCruisePanel() {
+  const panel = document.getElementById('cruisePanel');
+  const btn = panel.querySelector('.panel-toggle');
+  panel.classList.toggle('collapsed');
+  btn.textContent = panel.classList.contains('collapsed') ? '▶' : '◀';
+}
+
+/* 右侧面板折叠/展开 */
+function toggleCruisePanelRight() {
+  const panel = document.getElementById('cruisePanelRight');
+  const btn = panel.querySelector('.panel-toggle');
+  panel.classList.toggle('collapsed');
+  btn.textContent = panel.classList.contains('collapsed') ? '◀' : '▶';
+}
+
+/* 巡检任务处置 */
+function handleTask(btn) {
+  btn.textContent = '已处置';
+  btn.style.color = '#4CAF50';
+  btn.style.borderColor = '#4CAF50';
+  btn.disabled = true;
+  btn.classList.add('done');
+}
+</script>
+
+</body>
+</html>
