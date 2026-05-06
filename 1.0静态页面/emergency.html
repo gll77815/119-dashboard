@@ -1240,7 +1240,8 @@ function doRaycast(e){
 
 function updateLOD(){
   const lod=sph.r>50?1:sph.r>25?2:3;
-  document.getElementById('view-lbl').textContent=`${currentView==='xray'?'X-Ray':'标准3D'} · LOD-${lod}`;
+  const viewLbl = document.getElementById('view-lbl');
+  if(viewLbl) viewLbl.textContent=`${currentView==='xray'?'X-Ray':'标准3D'} · LOD-${lod}`;
   const showSystems=['LA','LB','LC','LD','LE','LF','LG'];
   showSystems.forEach(lid=>{systemSprites[lid].forEach(sp=>{sp.visible=layerState[lid]&&(lod===1?sp.userData.status==='alarm':true);});});
   patrolSprites.forEach(sp=>{sp.visible=layerState['LH'];});
